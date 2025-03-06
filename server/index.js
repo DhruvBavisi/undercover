@@ -209,13 +209,16 @@ io.on('connection', (socket) => {
 // Start server
 const PORT = process.env.PORT || 3000;
 
-// Check if we're in a Vercel serverless environment
+// For Vercel serverless deployment and local development
 if (process.env.VERCEL) {
-  // Export the Express app for Vercel serverless deployment
-  export default app;
+  console.log('Running in Vercel environment');
+  // Don't start the server in Vercel environment
 } else {
   // Start the server normally for local development
   server.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
   });
 }
+
+// Export the Express app for Vercel serverless deployment
+export { app as default };
