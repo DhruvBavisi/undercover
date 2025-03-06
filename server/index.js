@@ -16,16 +16,34 @@ connectDB();
 
 const app = express();
 const server = http.createServer(app);
+
+// Configure Socket.io with appropriate CORS for Vercel
 const io = new Server(server, {
   cors: {
-    origin: process.env.CLIENT_URL || 'http://localhost:5173',
+    origin: process.env.NODE_ENV === 'production' 
+      ? ['https://undercover-game.vercel.app', 'https://un-cv.vercel.app', process.env.CLIENT_URL] 
+      : 'http://localhost:5173',
     methods: ['GET', 'POST'],
+    credentials: true
   },
+  path: '/socket.io/',
+  addTrailingSlash: false,
+  transports: ['websocket', 'polling']
 });
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: process.env.NODE_ENV === 'production' 
+    ? ['https://undercover-game.vercel.app', 'https://un-cv.vercel.app', process.env.CLIENT_URL]
+    : 'http://localhost:5173',
+  credentials: true
+}));
 app.use(express.json());
+
+// Health check route for Vercel
+app.get('/api/health', (req, res) => {
+  res.status(200).json({ status: 'ok', message: 'Undercover Word Game API is running' });
+});
 
 // Routes
 app.get('/', (req, res) => {
@@ -190,6 +208,14 @@ io.on('connection', (socket) => {
 
 // Start server
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-}); 
+
+// Check if we're in a Vercel serverless environment
+if (process.env.VERCEL) {
+  // Export the Express app for Vercel serverless deployment
+  export default app;
+} else {
+  // Start the server normally for local development
+  server.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+}
