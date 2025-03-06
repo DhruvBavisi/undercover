@@ -11,6 +11,7 @@ import HowToPlayPage from './pages/HowToPlayPage.jsx';
 import OfflinePage from './pages/OfflinePage.jsx';
 import OfflineGamePage from './pages/OfflineGamePage.jsx';
 import GroupsPage from './pages/GroupsPage.jsx';
+import GroupDetailsPage from './pages/GroupDetailsPage.jsx'; // Added import statement
 import { ThemeProvider } from './components/theme-provider.jsx';
 
 const router = createBrowserRouter([
@@ -26,6 +27,7 @@ const router = createBrowserRouter([
       { path: 'offline', element: <OfflinePage /> },
       { path: 'offline/game', element: <OfflineGamePage /> },
       { path: 'groups', element: <GroupsPage /> },
+      { path: 'group/:groupId', element: <GroupDetailsPage /> },
     ],
   },
 ]);

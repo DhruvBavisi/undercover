@@ -1,6 +1,18 @@
 import mongoose from 'mongoose';
 
 const groupSchema = new mongoose.Schema({
+  name: {
+    type: String,
+    required: true
+  },
+  description: {
+    type: String,
+    default: 'A new group'
+  },
+  members: {
+    type: [String],
+    required: true
+  },
   groupName: {
     type: String,
     required: true,
@@ -11,10 +23,6 @@ const groupSchema = new mongoose.Schema({
     required: true,
     unique: true
   },
-  members: [{
-    type: String,
-    trim: true
-  }],
   gamesPlayed: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'OfflineGame'

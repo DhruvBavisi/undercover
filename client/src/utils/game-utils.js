@@ -3,53 +3,41 @@
  * @param {string} category - The category of words to use
  * @returns {string[]} - Array with two related words [civilianWord, undercoverWord]
  */
-export function getRandomWordPair(category = 'general') {
-  // Sample word pairs for different categories
-  const wordPairs = {
-    general: [
-      ['Dog', 'Wolf'],
-      ['Car', 'Truck'],
-      ['House', 'Apartment'],
-      ['Chair', 'Sofa'],
-      ['Phone', 'Computer'],
-      ['Book', 'Magazine'],
-      ['Coffee', 'Tea'],
-      ['Beach', 'Pool'],
-      ['Pizza', 'Burger'],
-      ['Movie', 'TV Show']
-    ],
-    tech: [
-      ['JavaScript', 'TypeScript'],
-      ['React', 'Angular'],
-      ['Node.js', 'Deno'],
-      ['MongoDB', 'PostgreSQL'],
-      ['GitHub', 'GitLab'],
-      ['Chrome', 'Firefox'],
-      ['Windows', 'MacOS'],
-      ['iPhone', 'Android'],
-      ['AWS', 'Azure'],
-      ['Docker', 'Kubernetes']
-    ],
-    food: [
-      ['Pizza', 'Pasta'],
-      ['Burger', 'Sandwich'],
-      ['Apple', 'Orange'],
-      ['Coffee', 'Tea'],
-      ['Cake', 'Pie'],
-      ['Rice', 'Noodles'],
-      ['Chicken', 'Turkey'],
-      ['Chocolate', 'Vanilla'],
-      ['Sushi', 'Sashimi'],
-      ['Taco', 'Burrito']
-    ]
-  };
+// Keep track of used word pairs to prevent repetition
+const usedWordPairs = new Set();
 
-  // Get word pairs for the selected category or use general if category doesn't exist
-  const selectedWordPairs = wordPairs[category] || wordPairs.general;
+// Import word pairs
+import wordPairsData from '../data/word-pairs.js';
+
+export function getRandomWordPair(category = 'general') {
+  // If all word pairs have been used, reset the tracking
+  if (usedWordPairs.size >= wordPairsData.length) {
+    usedWordPairs.clear();
+    console.log('All word pairs have been used, resetting tracking');
+  }
+
+  // Filter out word pairs that have already been used
+  const availablePairs = wordPairsData.filter(pair => {
+    const pairKey = `${pair[0]}-${pair[1]}`;
+    return !usedWordPairs.has(pairKey);
+  });
+
+  // Select a random word pair from available pairs
+  const randomIndex = Math.floor(Math.random() * availablePairs.length);
+  const selectedPair = availablePairs[randomIndex];
   
-  // Select a random word pair
-  const randomIndex = Math.floor(Math.random() * selectedWordPairs.length);
-  return selectedWordPairs[randomIndex];
+  // Mark this pair as used
+  usedWordPairs.add(`${selectedPair[0]}-${selectedPair[1]}`);
+  
+  return selectedPair;
+}
+
+/**
+ * Reset the used word pairs tracking
+ */
+export function resetUsedWordPairs() {
+  usedWordPairs.clear();
+  console.log('Word pair tracking has been reset');
 }
 
 /**

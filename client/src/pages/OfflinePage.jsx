@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Link } from "react-router-dom";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -24,13 +24,15 @@ import { useToast } from "../hooks/use-toast"; // Import toast
 
 export default function OfflinePage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { playerNames: initialPlayerNames = [] } = location.state || {};
   const { toast } = useToast();
-  const [playerCount, setPlayerCount] = useState(3);
+  const [playerCount, setPlayerCount] = useState(initialPlayerNames.length || 3);
   const [includeWhite, setIncludeWhite] = useState(true);
   const [undercoverCount, setUndercoverCount] = useState(1);
   const [mrWhiteCount, setMrWhiteCount] = useState(0);
   const [wordCategory, setWordCategory] = useState("general");
-  const [playerNames, setPlayerNames] = useState(Array(3).fill(""));
+  const [playerNames, setPlayerNames] = useState(initialPlayerNames.length ? initialPlayerNames : Array(3).fill(""));
   const [nameErrors, setNameErrors] = useState(Array(3).fill(""));
 
   // Refs for player name inputs
@@ -40,6 +42,12 @@ export default function OfflinePage() {
   useEffect(() => {
     inputRefs.current = inputRefs.current.slice(0, playerCount);
   }, [playerCount]);
+
+  useEffect(() => {
+    if (initialPlayerNames.length) {
+      applyRecommendedRoles(initialPlayerNames.length);
+    }
+  }, [initialPlayerNames]);
 
   useEffect(() => {
     // Check if we're returning from the game page to add more players

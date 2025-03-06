@@ -1,6 +1,6 @@
 import express from 'express';
 import Game from '../models/Game.js';
-import WordPair from '../models/WordPair.js';
+import { getRandomWordPair, getCategories } from '../utils/wordPairManager.js';
 
 const router = express.Router();
 
@@ -133,9 +133,8 @@ router.post('/:gameCode/start', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Game has already started' });
     }
     
-    // Get a random word pair
-    const wordPairs = await WordPair.find({ category: game.settings.wordCategory });
-    const randomPair = wordPairs[Math.floor(Math.random() * wordPairs.length)];
+    // Get a random word pair using our new utility function
+    const randomPair = getRandomWordPair(game.settings.wordCategory);
     
     // Assign roles and words to players
     const playerCount = game.players.length;
@@ -184,4 +183,15 @@ router.post('/:gameCode/start', async (req, res) => {
   }
 });
 
-export default router; 
+// Get available categories
+router.get('/categories', (req, res) => {
+  try {
+    const categories = getCategories();
+    res.json({ success: true, categories });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+export default router;
