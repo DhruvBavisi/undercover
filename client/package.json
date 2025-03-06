@@ -40,6 +40,7 @@
     "@radix-ui/react-tooltip": "^1.1.6",
     "autoprefixer": "^10.4.20",
     "class-variance-authority": "^0.7.1",
+    "cloudinary": "^1.41.0",
     "clsx": "^2.1.1",
     "cmdk": "1.0.4",
     "date-fns": "4.1.0",
@@ -70,4 +71,4 @@
     "tailwindcss": "^3.4.17",
     "vite": "^5.1.4"
   }
-} 
+}

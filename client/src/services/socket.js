@@ -1,6 +1,7 @@
 import { io } from 'socket.io-client';
+import config from '../lib/config';
 
-const SOCKET_URL = 'http://localhost:3000';
+const SOCKET_URL = config.socketUrl;
 
 class SocketService {
   constructor() {
@@ -118,4 +119,4 @@ class SocketService {
 // Create a singleton instance
 const socketService = new SocketService();
 
-export default socketService; 
+export default socketService;
