@@ -1,0 +1,21 @@
+{
+  "name": "un-cv-server",
+  "version": "1.0.0",
+  "description": "Server for Undercover Word Game",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.18.3",
+    "mongoose": "^8.2.0",
+    "socket.io": "^4.7.4"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0"
+  }
+} 
