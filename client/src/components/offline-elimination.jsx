@@ -67,7 +67,7 @@ export default function OfflineElimination({ player, civilianWord, onWhiteGuess,
           <CardHeader className="text-center border-b border-gray-700">
             <CardTitle className="text-2xl">Player Eliminated</CardTitle>
           </CardHeader>
-          <CardContent className="text-center space-y-6 py-6">
+          <CardContent className="text-center space-y-6 py-6 pt-6">
             {!showRole ? (
               <div className="py-8">
                 <h2 className="text-3xl font-bold mb-6">{player.name}</h2>
@@ -101,8 +101,8 @@ export default function OfflineElimination({ player, civilianWord, onWhiteGuess,
 
                 {player.role !== "Mr. White" ? (
                   <div className="mb-6">
-                    <div className="text-sm text-gray-400 mb-1">Their Secret Word</div>
-                    <div className="bg-gray-700/50 rounded p-3 text-center font-mono text-2xl">{player.word}</div>
+                    {/* <div className="text-sm text-gray-400 mb-1">Their Role</div>
+                    <div className="bg-gray-700/50 rounded p-3 text-center font-mono text-2xl">{player.role}</div> */}
                   </div>
                 ) : !guessSubmitted ? (
                   <div className="mb-6">

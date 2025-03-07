@@ -172,8 +172,7 @@ io.on('connection', (socket) => {
           // Broadcast updated game state
           io.to(gameCode).emit('player-eliminated', { 
             playerId, 
-            role: player.role,
-            word: player.word
+            role: player.role
           });
         }
       }

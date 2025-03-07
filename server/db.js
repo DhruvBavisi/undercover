@@ -6,7 +6,7 @@ dotenv.config();
 const connectDB = async () => {
   try {
     // Connect to MongoDB with the specific database name
-    const conn = await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/undercover-game');
+    const conn = await mongoose.connect(process.env.MONGO_URL || 'mongodb://localhost:27017/undercover-game');
     console.log(`MongoDB Connected: ${conn.connection.host}`);
     
     // Word pairs are now stored in a static file instead of the database
