@@ -327,118 +327,102 @@ export default function OfflinePage() {
                   />
                 </div>
 
-                <div className="space-y-6">
+                <div className="space-y-4">
                   {/* Civilians Display */}
-                  <div className="bg-sky-500/20 rounded-full py-2 px-5 text-center">
-                    <div className="flex items-center justify-center gap-2">
-                      <User className="w-5 h-5 text-sky-400" />
-                      <span className="text-base font-semibold text-sky-400">
-                        {calculateCivilians()} Civilians
-                      </span>
-                    </div>
+                  <div className="bg-blue-500 px-8 py-1.5 rounded-full text-white !w-fit mx-auto">
+                    <span className="text-base font-semibold">
+                      {playerCount - undercoverCount - mrWhiteCount} Civilians
+                    </span>
                   </div>
 
-                  {/* Undercover Controls */}
-                  <div className="bg-black rounded-full py-2 px-5">
-                    <div className="flex items-center justify-between">
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        className="h-6 w-4 rounded-full bg-gray-700 hover:bg-gray-600 text-gray-100"
-                        onClick={() =>
-                          setUndercoverCount(Math.max(0, undercoverCount - 1))
-                        }
-                        disabled={undercoverCount <= 0}
-                      >
-                        <Minus className="h-3 w-3" />
-                      </Button>
+                  {/* Undercover and Mr. White Controls */}
+                  <div className="flex flex-col items-center gap-4">
+                    {/* Undercover Controls */}
+                    <div className="flex items-center gap-2">
+                      {undercoverCount > 0 ? (
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => setUndercoverCount(Math.max(0, undercoverCount - 1))}
+                          className="h-7 w-7 !rounded-full bg-black text-white hover:bg-black/80"
+                        >
+                          <Minus className="h-3 w-3" />
+                        </Button>
+                      ) : (
+                        <div className="h-7 w-7 invisible" />
+                      )}
 
-                      <div className="flex items-center gap-2">
-                        <span className="text-base font-semibold">
-                          {undercoverCount} Undercovers
-                        </span>
+                      <div className="bg-black px-8 py-[7px] rounded-full text-white font-semibold">
+                        {undercoverCount} {undercoverCount === 1 ? 'Undercover' : 'Undercovers'}
                       </div>
 
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        className="h-6 w-4 rounded-full bg-gray-700 hover:bg-gray-600 text-gray-100"
-                        onClick={() => {
-                          const newCount = undercoverCount + 1;
-                          if (
-                            newCount <= maxUndercover &&
-                            newCount + (includeWhite ? mrWhiteCount : 0) <=
-                              playerCount - minCivilians
-                          ) {
-                            setUndercoverCount(newCount);
-                          }
-                        }}
-                        disabled={
-                          undercoverCount >= maxUndercover ||
-                          undercoverCount + (includeWhite ? mrWhiteCount : 0) >=
-                            playerCount - minCivilians
-                        }
-                      >
-                        <Plus className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  </div>
-
-                  {/* Mr. White Controls */}
-                  <div className="bg-white rounded-full py-2 px-5">
-                    <div className="flex items-center justify-between">
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        className="h-6 w-4 rounded-full bg-gray-700 hover:bg-gray-600 text-gray-100"
-                        onClick={() => {
-                          if (mrWhiteCount <= 1) {
-                            setIncludeWhite(false);
-                            setMrWhiteCount(0);
-                          } else {
-                            setMrWhiteCount(mrWhiteCount - 1);
-                          }
-                        }}
-                        disabled={!includeWhite || mrWhiteCount <= 0}
-                      >
-                        <Minus className="h-3 w-3" />
-                      </Button>
-
-                      <div className="flex items-center gap-2">
-                        <span className="text-base font-semibold text-gray-800">
-                          {mrWhiteCount} Mr. White
-                        </span>
-                      </div>
-
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        className="h-6 w-4 rounded-full bg-gray-700 hover:bg-gray-600 text-gray-100"
-                        onClick={() => {
-                          if (!includeWhite) {
-                            setIncludeWhite(true);
-                            setMrWhiteCount(1);
-                          } else {
-                            const newCount = mrWhiteCount + 1;
-                            if (
-                              newCount <= maxMrWhite &&
-                              newCount + undercoverCount <=
-                                playerCount - minCivilians
-                            ) {
-                              setMrWhiteCount(newCount);
+                      {undercoverCount + (includeWhite ? mrWhiteCount : 0) < playerCount - minCivilians ? (
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => {
+                            const newCount = undercoverCount + 1;
+                            if (newCount <= maxUndercover) {
+                              setUndercoverCount(newCount);
                             }
-                          }
-                        }}
-                        disabled={
-                          includeWhite
-                            ? mrWhiteCount >= maxMrWhite ||
-                              mrWhiteCount + undercoverCount >=
-                                playerCount - minCivilians
-                            : getMaxMrWhite(playerCount) === 0
-                        }
-                      >
-                        <Plus className="h-3 w-3" />
-                      </Button>
+                          }}
+                          className="h-7 w-7 !rounded-full bg-black text-white hover:bg-black/80"
+                        >
+                          <Plus className="h-3 w-3" />
+                        </Button>
+                      ) : (
+                        <div className="h-7 w-7 invisible" />
+                      )}
+                    </div>
+
+                    {/* Mr. White Controls */}
+                    <div className="flex items-center gap-2">
+                      {mrWhiteCount > 0 ? (
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => {
+                            if (mrWhiteCount <= 1) {
+                              setIncludeWhite(false);
+                              setMrWhiteCount(0);
+                            } else {
+                              setMrWhiteCount(mrWhiteCount - 1);
+                            }
+                          }}
+                          className="h-6 w-6 !rounded-full bg-white text-black hover:bg-white/80"
+                        >
+                          <Minus className="h-2.5 w-2.5" />
+                        </Button>
+                      ) : (
+                        <div className="h-6 w-6 invisible" />
+                      )}
+
+                      <div className="bg-white px-8 py-1.5 rounded-full text-black font-semibold">
+                        {mrWhiteCount} Mr. White
+                      </div>
+
+                      {mrWhiteCount + undercoverCount < playerCount - minCivilians ? (
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => {
+                            if (!includeWhite) {
+                              setIncludeWhite(true);
+                              setMrWhiteCount(1);
+                            } else {
+                              const newCount = mrWhiteCount + 1;
+                              if (newCount <= maxMrWhite) {
+                                setMrWhiteCount(newCount);
+                              }
+                            }
+                          }}
+                          className="h-6 w-6 !rounded-full bg-white text-black hover:bg-white/80"
+                        >
+                          <Plus className="h-2.5 w-2.5" />
+                        </Button>
+                      ) : (
+                        <div className="h-6 w-6 invisible" />
+                      )}
                     </div>
                   </div>
 

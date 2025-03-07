@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from './ui/card';
@@ -36,8 +36,6 @@ export default function OfflineGameOver({
   onAddPlayer,
   onQuit,
 }) {
-  const [showPointsTable, setShowPointsTable] = useState(false);
-
   // Determine the winning team based on remaining players and Mr. White guess
   const remainingCivilians = players.filter(p => !p.isEliminated && p.role === "Civilian");
   const remainingUndercover = players.filter(p => !p.isEliminated && p.role === "Undercover");
@@ -91,7 +89,7 @@ export default function OfflineGameOver({
   const topScorer = getTopScorer();
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="container mx-auto px-4 pt-20 pb-8">
       <Card className="bg-gray-800/70 border-gray-700 max-w-4xl mx-auto">
         <CardHeader className="text-center border-b border-gray-700">
           <div className="flex justify-center items-center mb-4">
@@ -139,62 +137,40 @@ export default function OfflineGameOver({
             </div>
           </div>
 
-          <div className="mb-4 flex justify-between items-center">
+          <div className="mb-4">
             <h3 className="text-lg font-semibold">Player Roles</h3>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => setShowPointsTable(!showPointsTable)}
-            >
-              {showPointsTable ? "Hide Points" : "Show Points"}
-            </Button>
           </div>
 
           <div className="bg-gray-700/20 rounded-lg overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow className="border-b border-gray-700">
-                  <TableHead className="text-gray-400">Player</TableHead>
-                  <TableHead className="text-gray-400">Role</TableHead>
-                  {showPointsTable && (
-                    <TableHead className="text-gray-400 text-right">Points</TableHead>
-                  )}
+            <Table className="w-full">
+              <TableHeader className="bg-gray-700/50">
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="text-gray-300 font-semibold py-3 text-left">Player</TableHead>
+                  <TableHead className="text-gray-300 font-semibold py-3 text-center">Role</TableHead>
+                  <TableHead className="text-gray-300 font-semibold py-3 text-center">Points</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {players.map((player) => (
-                  <TableRow 
-                    key={player.id} 
-                    className={`border-b border-gray-700/50 ${player.isEliminated ? "opacity-60" : ""}`}
+                {players.map((player, index) => (
+                  <TableRow
+                    key={player.id}
+                    className={`${index % 2 === 0 ? 'bg-gray-700/10' : 'bg-gray-700/20'} hover:bg-gray-700/30 transition-colors border-b border-gray-700/50 ${player.isEliminated ? 'opacity-60' : ''}`}
                   >
-                    <TableCell className="flex items-center gap-2">
+                    <TableCell className="flex items-center gap-2 py-3">
                       <Avatar className="h-8 w-8">
                         <AvatarImage src={player.avatar} alt={player.role} />
-                        <AvatarFallback className={
-                          player.role === "Civilian" ? "bg-green-500/20" : 
-                          player.role === "Undercover" ? "bg-red-500/20" : 
-                          "bg-purple-500/20"
-                        }>
+                        <AvatarFallback className={player.role === "Civilian" ? "bg-green-500/20" : player.role === "Undercover" ? "bg-red-500/20" : "bg-purple-500/20"}>
                           {player.name[0]}
                         </AvatarFallback>
                       </Avatar>
                       <span>{player.name}</span>
                     </TableCell>
-                    <TableCell className={
-                      player.role === "Civilian" ? "text-green-500" : 
-                      player.role === "Undercover" ? "text-red-500" : 
-                      "text-purple-500"
-                    }>
-                      {player.role}
-                      {player.role !== "Mr. White" && (
-                        <span className="text-gray-400 text-xs ml-1">
-                          ({player.role === "Civilian" ? civilianWord : undercoverWord})
-                        </span>
-                      )}
+                    <TableCell className="text-center py-3">
+                      <span className={player.role === "Civilian" ? "text-green-500" : player.role === "Undercover" ? "text-red-500" : "text-purple-500"}>
+                        {player.role}
+                      </span>
                     </TableCell>
-                    {showPointsTable && (
-                      <TableCell className="text-right">{scores[player.id] || 0}</TableCell>
-                    )}
+                    <TableCell className="text-center py-3">{scores[player.id] || 0}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -202,33 +178,19 @@ export default function OfflineGameOver({
           </div>
         </CardContent>
 
-        <CardFooter className="flex flex-col gap-4 border-t border-gray-700 pt-6">
-          <div className="grid grid-cols-3 gap-4 w-full">
-            <Button 
-              variant="outline" 
-              className="gap-2" 
-              onClick={onAddPlayer}
-            >
-              <UserPlus className="h-4 w-4" />
-              Add Player
-            </Button>
-            <Button 
-              variant="outline" 
-              className="gap-2" 
-              onClick={onRestart}
-            >
-              <RotateCcw className="h-4 w-4" />
-              Play Again
-            </Button>
-            <Button 
-              variant="outline" 
-              className="gap-2" 
-              onClick={onQuit}
-            >
-              <Home className="h-4 w-4" />
-              Exit Game
-            </Button>
-          </div>
+        <CardFooter className="flex flex-col sm:flex-row gap-4 p-6">
+          <Button className="!bg-green-600 hover:!bg-green-700 w-full sm:w-auto" onClick={onRestart}>
+            <RotateCcw className="mr-2 h-4 w-4" />
+            Play Again
+          </Button>
+          <Button className="bg-white text-gray-900 hover:bg-gray-100 w-full sm:w-auto" onClick={onAddPlayer}>
+            <UserPlus className="mr-2 h-4 w-4" />
+            Add Player
+          </Button>
+          <Button className="!bg-red-600 hover:!bg-red-700 w-full sm:w-auto" onClick={onQuit}>
+            <Home className="mr-2 h-4 w-4" />
+            Quit
+          </Button>
         </CardFooter>
       </Card>
     </div>

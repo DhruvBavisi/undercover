@@ -10,6 +10,7 @@ import OfflineElimination from "../components/offline-elimination"
 import OfflineGameOver from "../components/offline-game-over"
 import PauseMenu from "../components/pause-menu"
 import { getRandomWordPair, assignRoles, randomizeSpeakingOrder } from "../utils/game-utils"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "../components/ui/dialog"
 
 /**
  * @typedef {Object} Player
@@ -41,6 +42,8 @@ export default function OfflineGamePage() {
   const [isPaused, setIsPaused] = useState(false)
   const [scores, setScores] = useState({})
   const [isLoading, setIsLoading] = useState(true)
+  const [showQuitConfirm, setShowQuitConfirm] = useState(false);
+  const [showAddPlayerConfirm, setShowAddPlayerConfirm] = useState(false);
 
   useEffect(() => {
     const storedSettings = localStorage.getItem("offlineGameSettings")
@@ -63,7 +66,7 @@ export default function OfflineGamePage() {
         )
         
         setPlayers(initialPlayers)
-        setSpeakingOrder(initialOrder)
+        setSpeakingOrder(randomizeSpeakingOrder(initialPlayers, 1))
         
         // Initialize scores
         const initialScores = {}
@@ -153,7 +156,7 @@ export default function OfflineGamePage() {
       setGamePhase("gameOver");
     } else {
       // Randomize speaking order for the next round
-      const newSpeakingOrder = randomizeSpeakingOrder(remainingPlayers);
+      const newSpeakingOrder = randomizeSpeakingOrder(remainingPlayers, round + 1);
       setSpeakingOrder(newSpeakingOrder);
 
       setRound(round + 1);
@@ -165,56 +168,64 @@ export default function OfflineGamePage() {
   }
 
   const handleRestartGame = () => {
-    // Reset game state
-    setRound(1)
-    setCurrentPlayerIndex(0)
-    setEliminatedPlayerId(null)
-    setWhiteGuessCorrect(false)
-    
+    // Reset game state while preserving scores
+    setRound(1);
+    setCurrentPlayerIndex(0);
+    setEliminatedPlayerId(null);
+    setWhiteGuessCorrect(false);
+
     // Re-assign roles and words
-    const newWordPair = getRandomWordPair(gameSettings.wordCategory)
-    setWordPair(newWordPair)
-    
+    const newWordPair = getRandomWordPair(gameSettings.wordCategory);
+    setWordPair(newWordPair);
+
     const { players: newPlayers, speakingOrder: newOrder } = assignRoles(
       players.map((p) => p.name),
       players.length,
       gameSettings.includeWhite,
       newWordPair,
       gameSettings.undercoverCount
-    )
-    
-    setPlayers(newPlayers)
-    setSpeakingOrder(newOrder)
-    
-    // Reset scores
-    const newScores = {}
+    );
+
+    // Preserve scores for existing players
+    const newScores = { ...scores };
     newPlayers.forEach((player) => {
-      newScores[player.id] = 0
-    })
-    setScores(newScores)
-    setGamePhase("pass")
-  }
+      if (!newScores[player.id]) {
+        newScores[player.id] = 0;
+      }
+    });
+
+    setPlayers(newPlayers);
+    setSpeakingOrder(randomizeSpeakingOrder(newPlayers, 1));
+    setScores(newScores);
+    setGamePhase("pass");
+  };
 
   const handleAddPlayer = () => {
+    setShowAddPlayerConfirm(true);
+  };
+
+  const confirmAddPlayer = () => {
     // Store current players in localStorage to preserve them
     const currentPlayerNames = players.map(p => p.name);
-    
-    // Update the game settings in localStorage
-    const updatedSettings = {
-      ...gameSettings,
-      playerNames: currentPlayerNames
-    };
-    
-    localStorage.setItem("offlineGameSettings", JSON.stringify(updatedSettings));
-    localStorage.setItem("returnToSetup", "true");
-    
-    // Navigate to the offline setup page
-    navigate("/offline");
-  }
+    localStorage.setItem('offlineGamePlayers', JSON.stringify(currentPlayerNames));
+    navigate('/offline/setup');
+  };
+
+  const cancelAddPlayer = () => {
+    setShowAddPlayerConfirm(false);
+  };
 
   const handleQuit = () => {
-    navigate("/")
-  }
+    setShowQuitConfirm(true);
+  };
+
+  const confirmQuit = () => {
+    navigate('/');
+  };
+
+  const cancelQuit = () => {
+    setShowQuitConfirm(false);
+  };
 
   const renderGamePhase = () => {
     if (isLoading) {
@@ -279,28 +290,67 @@ export default function OfflineGamePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 text-white relative">
-      <div className="absolute top-4 right-4 flex items-center gap-4">
-        <Badge variant="outline" className="text-lg py-1 px-3">
-          Round {round}
-        </Badge>
-        <Button
-          variant="outline"
-          size="icon"
-          className="h-9 w-9"
-          onClick={() => setIsPaused(true)}
-        >
-          <Pause className="h-4 w-4" />
-        </Button>
+    <>
+      <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 text-white relative">
+        <div className="absolute top-4 right-4 flex items-center gap-4">
+          <Badge variant="outline" className="text-lg py-1 px-3">
+            Round {round}
+          </Badge>
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-9 w-9"
+            onClick={() => setIsPaused(true)}
+          >
+            <Pause className="h-4 w-4" />
+          </Button>
+        </div>
+        {renderGamePhase()}
+        {isPaused && (
+          <PauseMenu
+            onResume={() => setIsPaused(false)}
+            onRestart={handleRestartGame}
+            onQuit={handleQuit}
+            onAddPlayer={handleAddPlayer}
+          />
+        )}
       </div>
-      {renderGamePhase()}
-      {isPaused && (
-        <PauseMenu
-          onResume={() => setIsPaused(false)}
-          onRestart={handleRestartGame}
-          onQuit={handleQuit}
-        />
-      )}
-    </div>
+      <Dialog open={showQuitConfirm} onOpenChange={setShowQuitConfirm}>
+        <DialogContent className="bg-gray-800 text-white">
+          <DialogHeader>
+            <DialogTitle>Confirm Quit</DialogTitle>
+            <DialogDescription className="text-gray-400">
+              Are you sure you want to quit the game?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <Button onClick={confirmQuit} className="bg-red-600 hover:bg-red-700">
+              Quit Game
+            </Button>
+            <Button onClick={cancelQuit} variant="outline">
+              Cancel
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={showAddPlayerConfirm} onOpenChange={setShowAddPlayerConfirm}>
+        <DialogContent className="bg-gray-800 text-white">
+          <DialogHeader>
+            <DialogTitle>Confirm Add Player</DialogTitle>
+            <DialogDescription className="text-gray-400">
+              Adding a new player will restart the game. Continue?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <Button onClick={confirmAddPlayer} className="bg-green-600 hover:bg-green-700">
+              Add Player
+            </Button>
+            <Button onClick={cancelAddPlayer} variant="outline">
+              Cancel
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }
