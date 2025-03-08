@@ -183,7 +183,7 @@ export default function OfflineGameOver({
             <RotateCcw className="mr-2 h-4 w-4" />
             Play Again
           </Button>
-          <Button className="bg-white text-gray-900 hover:bg-gray-100 w-full sm:w-auto" onClick={onAddPlayer}>
+          <Button className="!bg-white !text-black hover:!bg-gray-300 !important !w-full sm:w-auto" onClick={onAddPlayer}>
             <UserPlus className="mr-2 h-4 w-4" />
             Add Player
           </Button>

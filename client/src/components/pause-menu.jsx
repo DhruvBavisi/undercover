@@ -22,16 +22,16 @@ export default function PauseMenu({ onResume, onRestart, onQuit, handleAddPlayer
           <CardTitle className="text-center text-2xl">Game Paused</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
-          <Button onClick={onResume} className="bg-green-600 hover:bg-green-700">
+          <Button onClick={onResume} style={{ backgroundColor: '#16a34a' }} className="hover:bg-[#15803d]">
             Resume
           </Button>
-          <Button onClick={onRestart} className="bg-purple-600 hover:bg-purple-700">
+          <Button onClick={onRestart}>
             Restart
           </Button>
-          <Button onClick={handleAddPlayer} variant="outline">
+          <Button onClick={handleAddPlayer} style={{ backgroundColor: 'white', color: 'black' }} className="!bg-white !text-black">
             Add Player
           </Button>
-          <Button onClick={onQuit} variant="outline" className="text-red-500 border-red-500 hover:bg-red-500/10">
+          <Button onClick={onQuit} style={{ backgroundColor: 'red', color: 'white' }} className="!bg-red-600 !text-white">
             Quit
           </Button>
         </CardContent>
