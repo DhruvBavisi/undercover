@@ -88,6 +88,16 @@ export default function OfflineGameOver({
   
   const topScorer = getTopScorer();
 
+  const handleAddPlayer = (event) => {
+    event.preventDefault();
+    onAddPlayer();
+  }
+
+  const handleQuit = (event) => {
+    event.preventDefault();
+    onQuit();
+  }
+
   return (
     <div className="container mx-auto px-4 pt-20 pb-8">
       <Card className="bg-gray-800/70 border-gray-700 max-w-4xl mx-auto">
@@ -183,11 +193,28 @@ export default function OfflineGameOver({
             <RotateCcw className="mr-2 h-4 w-4" />
             Play Again
           </Button>
-          <Button className="!bg-white !text-black hover:!bg-gray-300 !important !w-full sm:w-auto" onClick={onAddPlayer}>
+          <Button className="!bg-white !text-black hover:!bg-gray-300 !important !w-full sm:w-auto" onClick={handleAddPlayer}>
             <UserPlus className="mr-2 h-4 w-4" />
             Add Player
           </Button>
-          <Button className="!bg-red-600 hover:!bg-red-700 w-full sm:w-auto" onClick={onQuit}>
+          <Dialog
+            onOpenAutoFocus={(e) => e.preventDefault()}
+            onCloseAutoFocus={(e) => e.preventDefault()}
+          >
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Add Player</DialogTitle>
+              </DialogHeader>
+              <div className="flex flex-col gap-4">
+                <Input placeholder="Player Name" />
+                <Input placeholder="Player Avatar URL" />
+              </div>
+              <DialogFooter>
+                <Button>Add Player</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+          <Button className="!bg-red-600 hover:!bg-red-700 w-full sm:w-auto" onClick={handleQuit}>
             <Home className="mr-2 h-4 w-4" />
             Quit
           </Button>

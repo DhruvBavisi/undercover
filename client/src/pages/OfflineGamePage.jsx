@@ -104,45 +104,70 @@ export default function OfflineGamePage() {
   }
 
   const handleWhiteGuess = (guess, isCorrect) => {
-    setWhiteGuessCorrect(isCorrect)
+    setWhiteGuessCorrect(isCorrect);
     if (isCorrect) {
       // Mr. White wins, update scores
-      const newScores = { ...scores }
+      const newScores = { ...scores };
       players.forEach((player) => {
         if (player.role === "Mr. White") {
-          newScores[player.id] += 3 // Bonus points for correct guess
+          // Award decreasing points based on the round number
+          // First round: 5 points, second round: 4 points, etc.
+          const guessPoints = Math.max(6 - round, 2); // Minimum 2 points
+          newScores[player.id] += guessPoints;
         }
-      })
-      setScores(newScores)
+      });
+      setScores(newScores);
     }
   }
 
   const handleEliminationComplete = () => {
     const eliminatedPlayer = players.find((p) => p.id === eliminatedPlayerId);
     if (eliminatedPlayer?.role === "Mr. White" && whiteGuessCorrect) {
+      // Final score calculation for game over
+      calculateFinalScores();
       setGamePhase("gameOver");
       return;
     }
 
     const remainingPlayers = players.filter((p) => !p.isEliminated);
 
-    // Update scores based on elimination
+    // Update scores based on elimination and survival
     const newScores = { ...scores };
-    if (eliminatedPlayer?.role === "Undercover" || eliminatedPlayer?.role === "Mr. White") {
+    
+    // 1. Base points for surviving the round
+    remainingPlayers.forEach((player) => {
+      newScores[player.id] = (newScores[player.id] || 0) + 1; // 1 point for surviving
+    });
+    
+    // 2. Points for eliminating specific roles
+    if (eliminatedPlayer?.role === "Undercover") {
       remainingPlayers.forEach((player) => {
         if (player.role === "Civilian") {
-          newScores[player.id] += 1; // Point for correct elimination
+          newScores[player.id] += 2; // 2 points for eliminating an Undercover
+        }
+      });
+    } else if (eliminatedPlayer?.role === "Mr. White") {
+      remainingPlayers.forEach((player) => {
+        if (player.role === "Civilian") {
+          newScores[player.id] += 3; // 3 points for eliminating Mr. White
         }
       });
     } else if (eliminatedPlayer?.role === "Civilian") {
+      // Undercover players get points for successful deception
       remainingPlayers.forEach((player) => {
         if (player.role === "Undercover") {
-          newScores[player.id] += 1; // Point for successful deception
-        } else if (player.role === "Mr. White") {
-          newScores[player.id] += 1; // Point for Mr. White's survival
+          newScores[player.id] += 2; // 2 points for successful deception
         }
       });
     }
+    
+    // 3. Extra points for Undercover players for surviving each round
+    remainingPlayers.forEach((player) => {
+      if (player.role === "Undercover") {
+        newScores[player.id] += 1; // 1 extra point for Undercover survival
+      }
+    });
+    
     setScores(newScores);
 
     // Check game-over conditions
@@ -153,6 +178,8 @@ export default function OfflineGamePage() {
       remainingMrWhite.length === 0 ||
       remainingPlayers.length <= 2
     ) {
+      // Calculate final scores before game over
+      calculateFinalScores();
       setGamePhase("gameOver");
     } else {
       // Randomize speaking order for the next round
@@ -167,7 +194,47 @@ export default function OfflineGamePage() {
     setEliminatedPlayerId(null); // Reset eliminated player ID for the next round
   }
 
-  const handleRestartGame = () => {
+  // New function to calculate final scores at game end
+  const calculateFinalScores = () => {
+    const remainingPlayers = players.filter((p) => !p.isEliminated);
+    const remainingCivilians = remainingPlayers.filter(p => p.role === "Civilian");
+    const remainingUndercover = remainingPlayers.filter(p => p.role === "Undercover");
+    const remainingMrWhite = remainingPlayers.filter(p => p.role === "Mr. White");
+    const eliminatedMrWhite = players.filter(p => p.isEliminated && p.role === "Mr. White");
+    
+    // Determine the winning team
+    let winnerRole = "Civilians";
+    if (remainingCivilians.length <= remainingUndercover.length) {
+      winnerRole = "Undercover";
+    } else if (remainingMrWhite.length > 0) {
+      winnerRole = "Mr. White";
+    } else if (eliminatedMrWhite.length > 0 && whiteGuessCorrect) {
+      winnerRole = "Mr. White";
+    }
+    
+    const newScores = { ...scores };
+    
+    // Award bonus points to the winning team
+    players.forEach((player) => {
+      // Bonus points for winning team
+      if (
+        (winnerRole === "Civilians" && player.role === "Civilian") ||
+        (winnerRole === "Undercover" && player.role === "Undercover") ||
+        (winnerRole === "Mr. White" && player.role === "Mr. White")
+      ) {
+        newScores[player.id] += 3; // 3 bonus points for being on winning team
+      }
+      
+      // Extra bonus for Undercover victory
+      if (winnerRole === "Undercover" && player.role === "Undercover") {
+        newScores[player.id] += 2; // 2 extra points for Undercover victory
+      }
+    });
+    
+    setScores(newScores);
+  }
+
+  const handleRestart = () => {
     // Reset game state while preserving scores
     setRound(1);
     setCurrentPlayerIndex(0);
@@ -279,7 +346,7 @@ export default function OfflineGamePage() {
             undercoverWord={wordPair[1]}
             scores={scores}
             whiteGuessCorrect={whiteGuessCorrect}
-            onRestart={handleRestartGame}
+            onRestart={handleRestart}
             onAddPlayer={handleAddPlayer}
             onQuit={handleQuit}
           />
@@ -309,7 +376,7 @@ export default function OfflineGamePage() {
         {isPaused && (
           <PauseMenu
             onResume={() => setIsPaused(false)}
-            onRestart={handleRestartGame}
+            onRestart={handleRestart}
             onQuit={handleQuit}
             onAddPlayer={handleAddPlayer}
           />
