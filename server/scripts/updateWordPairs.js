@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 import WordPair from '../models/WordPair.js';
 
-// Connect to the database
+// Update MongoDB connection to use MONGODB_URI
 await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/undercover-game');
 
 // Delete all existing word pairs

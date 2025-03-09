@@ -21,13 +21,22 @@ connectDB();
 const app = express();
 const server = http.createServer(app);
 
-// Configure Socket.io with appropriate CORS for Render
+// Update CORS configuration
+const corsOptions = {
+  origin: process.env.NODE_ENV === 'production'
+    ? process.env.CLIENT_URL
+    : [process.env.CLIENT_URL, 'http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  credentials: true
+};
+
+// Configure Socket.io with appropriate CORS for Vercel
 const io = new Server(server, {
   cors: {
-    origin: process.env.NODE_ENV === 'production' 
-      ? [process.env.RENDER_URL, process.env.CLIENT_URL] 
+    origin: process.env.NODE_ENV === 'production'
+      ? process.env.CLIENT_URL
       : [process.env.CLIENT_URL, 'http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175'],
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    methods: ['GET', 'POST'],
     credentials: true
   },
   path: '/socket.io/',
@@ -36,13 +45,11 @@ const io = new Server(server, {
 });
 
 // Middleware
-app.use(cors({
-  origin: process.env.NODE_ENV === 'production' 
-    ? [process.env.RENDER_URL, process.env.CLIENT_URL]
-    : [process.env.CLIENT_URL, 'http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175'],
-  credentials: true
-}));
+app.use(cors(corsOptions));
 app.use(express.json());
+
+// Make io available to routes
+app.set('io', io);
 
 // Health check route for Vercel
 app.get('/api/health', (req, res) => {
@@ -64,8 +71,7 @@ app.use('/api/game-rooms', gameRoomRoutes);
 
 // Socket.io connection
 io.on('connection', (socket) => {
-  const environment = process.env.NODE_ENV === 'production' ? 'production' : 'development';
-  console.log(`[${environment}] Socket connected: ${socket.id}`);
+  console.log('A user connected:', socket.id);
 
   // Join a game room
   socket.on('join-game', async (data) => {
@@ -330,8 +336,9 @@ io.on('connection', (socket) => {
         // Update game status
         gameRoom.status = 'in-progress';
         gameRoom.currentRound = 1;
+        gameRoom.currentPhase = 'discussion';
         
-        // Initialize first round
+        // Initialize first round with first player's turn
         gameRoom.rounds.push({
           roundNumber: 1,
           playerTurn: gameRoom.players[0].userId,
@@ -344,7 +351,8 @@ io.on('connection', (socket) => {
         io.to(roomCode).emit('game-started', {
           roomCode: gameRoom.roomCode,
           status: gameRoom.status,
-          currentRound: gameRoom.currentRound
+          currentRound: gameRoom.currentRound,
+          currentPhase: gameRoom.currentPhase
         });
         
         // Send private role and word info to each player
@@ -362,46 +370,219 @@ io.on('connection', (socket) => {
       socket.emit('error', { message: 'Failed to start game' });
     }
   });
+  
+  // Handle chat messages
+  socket.on('send-message', async (data) => {
+    const { gameCode, playerId, content } = data;
+    
+    try {
+      const gameRoom = await GameRoom.findOne({ roomCode: gameCode });
+      if (gameRoom) {
+        const player = gameRoom.players.find(p => p.userId.toString() === playerId);
+        if (player) {
+          // Create message object
+          const message = {
+            id: `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            playerName: player.name,
+            playerId: player.userId,
+            content,
+            timestamp: Date.now()
+          };
+          
+          // Add message to game room
+          if (!gameRoom.messages) {
+            gameRoom.messages = [];
+          }
+          gameRoom.messages.push(message);
+          await gameRoom.save();
+          
+          // Broadcast message to all players in the room
+          io.to(gameCode).emit('receive-message', message);
+        }
+      }
+    } catch (error) {
+      console.error('Error sending message:', error);
+      socket.emit('error', { message: 'Failed to send message' });
+    }
+  });
+  
+  // Handle voting
+  socket.on('submit-vote', async (data) => {
+    const { gameCode, voterId, votedForId } = data;
+    
+    try {
+      const gameRoom = await GameRoom.findOne({ roomCode: gameCode });
+      if (gameRoom && gameRoom.currentPhase === 'voting') {
+        // Get current round
+        const currentRound = gameRoom.rounds[gameRoom.currentRound - 1];
+        
+        // Check if player has already voted
+        const existingVoteIndex = currentRound.votes.findIndex(v => v.voterId.toString() === voterId);
+        if (existingVoteIndex !== -1) {
+          // Update existing vote
+          currentRound.votes[existingVoteIndex].votedForId = votedForId;
+        } else {
+          // Add new vote
+          currentRound.votes.push({ voterId, votedForId });
+        }
+        
+        await gameRoom.save();
+        
+        // Broadcast vote to all players
+        io.to(gameCode).emit('vote-submitted', { voterId, votedForId });
+        
+        // Check if all players have voted
+        const activePlayers = gameRoom.players.filter(p => !p.isEliminated);
+        if (currentRound.votes.length === activePlayers.length) {
+          // Count votes
+          const voteCounts = {};
+          currentRound.votes.forEach(vote => {
+            if (!voteCounts[vote.votedForId]) {
+              voteCounts[vote.votedForId] = 0;
+            }
+            voteCounts[vote.votedForId]++;
+          });
+          
+          // Find player with most votes
+          let maxVotes = 0;
+          let eliminatedPlayerId = null;
+          
+          Object.entries(voteCounts).forEach(([playerId, count]) => {
+            if (count > maxVotes) {
+              maxVotes = count;
+              eliminatedPlayerId = playerId;
+            }
+          });
+          
+          // Eliminate player
+          if (eliminatedPlayerId) {
+            const playerIndex = gameRoom.players.findIndex(p => p.userId.toString() === eliminatedPlayerId);
+            if (playerIndex !== -1) {
+              gameRoom.players[playerIndex].isEliminated = true;
+              
+              // Get eliminated player info
+              const eliminatedPlayer = gameRoom.players[playerIndex];
+              
+              // Check if game is over
+              const remainingCivilians = gameRoom.players.filter(p => !p.isEliminated && p.role === 'civilian').length;
+              const remainingUndercovers = gameRoom.players.filter(p => !p.isEliminated && p.role === 'undercover').length;
+              const remainingMrWhites = gameRoom.players.filter(p => !p.isEliminated && p.role === 'mrwhite').length;
+              
+              let gameOver = false;
+              let winner = null;
+              
+              // Check win conditions
+              if (remainingCivilians === 0) {
+                // Undercovers win if all civilians are eliminated
+                gameOver = true;
+                winner = 'undercovers';
+              } else if (remainingUndercovers === 0 && remainingMrWhites === 0) {
+                // Civilians win if all undercovers and mr whites are eliminated
+                gameOver = true;
+                winner = 'civilians';
+              }
+              
+              // Update game room
+              gameRoom.currentPhase = 'elimination';
+              await gameRoom.save();
+              
+              // Send voting results to all players
+              io.to(gameCode).emit('voting-results', {
+                eliminatedPlayer: {
+                  id: eliminatedPlayer.userId,
+                  name: eliminatedPlayer.name,
+                  username: eliminatedPlayer.username,
+                  role: eliminatedPlayer.role,
+                  word: eliminatedPlayer.word
+                },
+                votes: currentRound.votes,
+                gameOver,
+                winner
+              });
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error submitting vote:', error);
+      socket.emit('error', { message: 'Failed to submit vote' });
+    }
+  });
+  
+  // Handle next turn
+  socket.on('next-turn', async (data) => {
+    const { gameCode, playerId } = data;
+    
+    try {
+      const gameRoom = await GameRoom.findOne({ roomCode: gameCode });
+      if (gameRoom && gameRoom.currentPhase === 'discussion') {
+        // Update current round with new player turn
+        const currentRound = gameRoom.rounds[gameRoom.currentRound - 1];
+        currentRound.playerTurn = playerId;
+        
+        await gameRoom.save();
+        
+        // Broadcast next turn to all players
+        io.to(gameCode).emit('next-turn', { playerId });
+      }
+    } catch (error) {
+      console.error('Error changing turn:', error);
+      socket.emit('error', { message: 'Failed to change turn' });
+    }
+  });
+  
+  // Handle game phase change
+  socket.on('change-game-phase', async (data) => {
+    const { gameCode, newPhase } = data;
+    
+    try {
+      const gameRoom = await GameRoom.findOne({ roomCode: gameCode });
+      if (gameRoom) {
+        // Update game phase
+        gameRoom.currentPhase = newPhase;
+        
+        // If moving to a new round, increment round number
+        if (newPhase === 'discussion' && gameRoom.currentPhase === 'elimination') {
+          gameRoom.currentRound++;
+          
+          // Initialize new round
+          gameRoom.rounds.push({
+            roundNumber: gameRoom.currentRound,
+            playerTurn: gameRoom.players.find(p => !p.isEliminated)?.userId,
+            votes: []
+          });
+        }
+        
+        await gameRoom.save();
+        
+        // Broadcast phase change to all players
+        io.to(gameCode).emit('phase-change', { phase: newPhase });
+      }
+    } catch (error) {
+      console.error('Error changing game phase:', error);
+      socket.emit('error', { message: 'Failed to change game phase' });
+    }
+  });
 
   // Handle disconnection
   socket.on('disconnect', () => {
-    console.log(`Socket disconnected: ${socket.id}`);
+    console.log('User disconnected:', socket.id);
   });
 });
 
 // Start server
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3000;
 
-// For Render deployment
-if (process.env.NODE_ENV === 'production') {
-  server.listen(PORT, () => {
-    console.log(`
-╔════════════════════════════════════════════════════════╗
-║                                                        ║
-║   Undercover Game Server Running in Production Mode    ║
-║                                                        ║
-║   Server URL: ${process.env.RENDER_URL}                
-║   Port: ${PORT}                                        
-║   Environment: ${process.env.NODE_ENV}                 
-║                                                        ║
-╚════════════════════════════════════════════════════════╝
-`);
-  });
+// For Vercel serverless deployment and local development
+if (process.env.VERCEL) {
+  console.log('Running in Vercel environment');
+  // Don't start the server in Vercel environment
 } else {
-  // Start the server for local development
+  // Start the server normally for local development
   server.listen(PORT, () => {
-    console.log(`
-╔════════════════════════════════════════════════════════╗
-║                                                        ║
-║   Undercover Game Server Running in Development Mode   ║
-║                                                        ║
-║   Server URL: http://localhost:${PORT}                 
-║   Environment: ${process.env.NODE_ENV || 'development'}
-║                                                        ║
-╚════════════════════════════════════════════════════════╝
-`);
+    console.log(`Server running on port ${PORT}`);
   });
 }
 
-// Export the Express app for serverless deployment
+// Export the Express app for Vercel serverless deployment
 export { app as default };

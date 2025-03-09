@@ -19,6 +19,9 @@ export const initSocket = () => {
   
   socket.on('connect', () => {
     console.log('Socket connected:', socket.id);
+    
+    // Make socket available globally
+    window.socket = socket;
   });
   
   socket.on('disconnect', () => {

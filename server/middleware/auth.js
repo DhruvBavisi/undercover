@@ -15,7 +15,7 @@ export const authenticateToken = (req, res, next) => {
 
   try {
     // Verify token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
     
     // Add user info to request
     req.user = decoded;
@@ -43,7 +43,7 @@ export const optionalAuthenticateToken = (req, res, next) => {
 
   try {
     // Verify token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your_jwt_secret');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
     
     // Add user info to request
     req.user = decoded;

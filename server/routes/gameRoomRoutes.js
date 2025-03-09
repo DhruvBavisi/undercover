@@ -241,6 +241,9 @@ router.delete('/rooms/:roomCode/leave', auth, async (req, res) => {
       return res.status(403).json({ success: false, message: 'You are not a member of this game room' });
     }
     
+    // Get player info before removing
+    const leavingPlayer = gameRoom.players.find(p => p.userId.toString() === userId.toString());
+    
     // Remove the player from the room
     gameRoom.removePlayer(userId);
     
@@ -255,6 +258,18 @@ router.delete('/rooms/:roomCode/leave', auth, async (req, res) => {
     }
     
     await gameRoom.save();
+    
+    // Emit player-left event to all clients in the room
+    if (req.app.get('io') && leavingPlayer) {
+      req.app.get('io').to(roomCode.toUpperCase()).emit('player-left', {
+        userId,
+        name: leavingPlayer.name,
+        username: leavingPlayer.username,
+        roomCode: gameRoom.roomCode,
+        hostId: gameRoom.hostId,
+        players: gameRoom.players
+      });
+    }
     
     res.json({ success: true, message: 'Left game room successfully' });
   } catch (error) {
@@ -302,6 +317,120 @@ router.patch('/rooms/:roomCode/settings', auth, async (req, res) => {
     });
   } catch (error) {
     console.error('Error updating game settings:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Remove a player from the game (host only)
+router.post('/rooms/:roomCode/remove-player', auth, async (req, res) => {
+  try {
+    const { roomCode } = req.params;
+    const { playerId } = req.body;
+    const userId = req.user.id;
+    
+    // Find the game room
+    const gameRoom = await GameRoom.findOne({ roomCode: roomCode.toUpperCase() });
+    if (!gameRoom) {
+      return res.status(404).json({ success: false, message: 'Game room not found' });
+    }
+    
+    // Check if the user is the host
+    if (gameRoom.hostId.toString() !== userId.toString()) {
+      return res.status(403).json({ success: false, message: 'Only the host can remove players' });
+    }
+    
+    // Check if the player exists in the room
+    const playerToRemove = gameRoom.players.find(p => p.userId.toString() === playerId.toString());
+    if (!playerToRemove) {
+      return res.status(404).json({ success: false, message: 'Player not found in this room' });
+    }
+    
+    // Cannot remove the host
+    if (playerId.toString() === gameRoom.hostId.toString()) {
+      return res.status(400).json({ success: false, message: 'Cannot remove the host' });
+    }
+    
+    // Remove the player
+    gameRoom.removePlayer(playerId);
+    await gameRoom.save();
+    
+    // Emit player-left event to all clients in the room
+    if (req.app.get('io') && playerToRemove) {
+      req.app.get('io').to(roomCode.toUpperCase()).emit('player-left', {
+        userId: playerId,
+        name: playerToRemove.name,
+        username: playerToRemove.username,
+        roomCode: gameRoom.roomCode,
+        hostId: gameRoom.hostId,
+        players: gameRoom.players
+      });
+    }
+    
+    res.json({ 
+      success: true, 
+      message: 'Player removed successfully',
+      room: gameRoom
+    });
+  } catch (error) {
+    console.error('Error removing player:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Reset a game to waiting state (host only)
+router.post('/rooms/:roomCode/reset', auth, async (req, res) => {
+  try {
+    const { roomCode } = req.params;
+    const userId = req.user.id;
+    
+    // Find the game room
+    const gameRoom = await GameRoom.findOne({ roomCode: roomCode.toUpperCase() });
+    if (!gameRoom) {
+      return res.status(404).json({ success: false, message: 'Game room not found' });
+    }
+    
+    // Check if the user is the host
+    if (gameRoom.hostId.toString() !== userId.toString()) {
+      return res.status(403).json({ success: false, message: 'Only the host can reset the game' });
+    }
+    
+    // Reset game state
+    gameRoom.status = 'waiting';
+    gameRoom.currentPhase = '';
+    gameRoom.currentRound = 0;
+    gameRoom.rounds = [];
+    gameRoom.messages = [];
+    gameRoom.words = { civilian: '', undercover: '' };
+    gameRoom.winner = '';
+    
+    // Reset player states
+    gameRoom.players.forEach(player => {
+      player.role = '';
+      player.word = '';
+      player.isEliminated = false;
+      player.isReady = false;
+    });
+    
+    await gameRoom.save();
+    
+    // Notify all clients that the game has been reset
+    if (req.app.get('io')) {
+      req.app.get('io').to(roomCode.toUpperCase()).emit('room-updated', {
+        roomCode: gameRoom.roomCode,
+        hostId: gameRoom.hostId,
+        players: gameRoom.players,
+        settings: gameRoom.settings,
+        status: gameRoom.status
+      });
+    }
+    
+    res.json({ 
+      success: true, 
+      message: 'Game reset successfully',
+      room: gameRoom
+    });
+  } catch (error) {
+    console.error('Error resetting game:', error);
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });

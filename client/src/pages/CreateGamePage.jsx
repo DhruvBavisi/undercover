@@ -7,25 +7,27 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Slider } from '../components/ui/slider';
-import { ArrowLeft, Plus, Minus, User, Copy, Users, Loader2, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Plus, Minus, User, Copy, Users, Loader2, AlertCircle, Info } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '../components/ui/card';
 import { useToast } from '../hooks/use-toast';
 import { Alert, AlertDescription } from '../components/ui/alert';
 import { MAX_PLAYERS, MIN_PLAYERS, DEFAULT_ROUND_TIME } from '../config';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../components/ui/tooltip';
 
 export default function CreateGamePage() {
   const { isAuthenticated, user } = useAuth();
-  const { create, loading, error } = useGameRoom();
+  const { create, room, loading, error } = useGameRoom();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [gameCode, setGameCode] = useState('');
-  const [gameCreated, setGameCreated] = useState(false);
+  
+  // Game settings
   const [maxPlayers, setMaxPlayers] = useState(8);
   const [roundTime, setRoundTime] = useState(DEFAULT_ROUND_TIME);
   const [wordPack, setWordPack] = useState('standard');
   const [numUndercovers, setNumUndercovers] = useState(1);
   const [numMrWhites, setNumMrWhites] = useState(0);
+  const [includeWhite, setIncludeWhite] = useState(numMrWhites > 0);
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -34,6 +36,128 @@ export default function CreateGamePage() {
     }
   }, [isAuthenticated, navigate]);
 
+  // Redirect to game room if created
+  useEffect(() => {
+    if (room) {
+      navigate(`/game/${room.roomCode}`);
+    }
+  }, [room, navigate]);
+
+  // Calculate recommended roles based on player count
+  const getRecommendedRoles = (count) => {
+    let recommended = { undercovers: 1, mrWhites: 0 };
+    
+    if (count <= 4) {
+      recommended = { undercovers: 1, mrWhites: 0 };
+    } else if (count <= 6) {
+      recommended = { undercovers: 1, mrWhites: includeWhite ? 1 : 0 };
+    } else if (count <= 8) {
+      recommended = { undercovers: 2, mrWhites: includeWhite ? 1 : 0 };
+    } else if (count <= 10) {
+      recommended = { undercovers: 2, mrWhites: includeWhite ? 1 : 0 };
+    } else {
+      recommended = { undercovers: 3, mrWhites: includeWhite ? 1 : 0 };
+    }
+    
+    return recommended;
+  };
+
+  // Apply recommended roles when max players changes
+  useEffect(() => {
+    const recommended = getRecommendedRoles(maxPlayers);
+    setNumUndercovers(recommended.undercovers);
+    setNumMrWhites(recommended.mrWhites);
+  }, [maxPlayers, includeWhite]);
+
+  // Update Mr. White count when includeWhite changes
+  useEffect(() => {
+    if (!includeWhite) {
+      setNumMrWhites(0);
+    } else {
+      const recommended = getRecommendedRoles(maxPlayers);
+      setNumMrWhites(recommended.mrWhites);
+    }
+  }, [includeWhite, maxPlayers]);
+
+  // Get maximum allowed undercovers based on player count
+  const getMaxUndercover = (count) => {
+    if (count <= 4) return 1;
+    if (count <= 6) return 2;
+    if (count <= 8) return 2;
+    if (count <= 10) return 3;
+    return 3;
+  };
+
+  // Get maximum allowed Mr. Whites based on player count
+  const getMaxMrWhite = (count) => {
+    if (!includeWhite) return 0;
+    if (count <= 4) return 0;
+    if (count <= 6) return 1;
+    if (count <= 8) return 1;
+    if (count <= 10) return 1;
+    return 2;
+  };
+
+  // Calculate minimum required civilians
+  const getMinCivilians = (count) => {
+    return Math.max(2, count - 5);
+  };
+
+  // Calculate number of civilians
+  const calculateCivilians = () => {
+    return maxPlayers - numUndercovers - numMrWhites;
+  };
+
+  // Handle max players change
+  const handleMaxPlayersChange = (value) => {
+    const newMaxPlayers = value[0];
+    setMaxPlayers(newMaxPlayers);
+    
+    // Adjust roles if needed
+    const maxUndercover = getMaxUndercover(newMaxPlayers);
+    const maxMrWhite = getMaxMrWhite(newMaxPlayers);
+    const minCivilians = getMinCivilians(newMaxPlayers);
+    
+    // Ensure we have enough civilians
+    let newUndercovers = Math.min(numUndercovers, maxUndercover);
+    let newMrWhites = Math.min(numMrWhites, maxMrWhite);
+    
+    // Check if we need to reduce special roles to maintain minimum civilians
+    while (newMaxPlayers - newUndercovers - newMrWhites < minCivilians) {
+      if (newMrWhites > 0) {
+        newMrWhites--;
+      } else if (newUndercovers > 1) {
+        newUndercovers--;
+      } else {
+        break;
+      }
+    }
+    
+    setNumUndercovers(newUndercovers);
+    setNumMrWhites(newMrWhites);
+  };
+
+  // Handle undercover count change
+  const handleUndercoverChange = (value) => {
+    const newUndercovers = value[0];
+    const minCivilians = getMinCivilians(maxPlayers);
+    
+    // Check if we need to reduce Mr. Whites to maintain minimum civilians
+    let newMrWhites = numMrWhites;
+    while (maxPlayers - newUndercovers - newMrWhites < minCivilians && newMrWhites > 0) {
+      newMrWhites--;
+    }
+    
+    setNumUndercovers(newUndercovers);
+    setNumMrWhites(newMrWhites);
+  };
+
+  // Handle Mr. White count change
+  const handleMrWhiteChange = (value) => {
+    setNumMrWhites(value[0]);
+  };
+
+  // Create game with current settings
   const handleCreateGame = async () => {
     // Create game settings object
     const settings = {
@@ -59,7 +183,7 @@ export default function CreateGamePage() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 text-white">
       <div className="container mx-auto px-4 py-12">
-        <Link to="/" className="inline-flex items-center text-gray-400 hover:text-white mb-8">
+        <Link to="/" className="text-blue-400 hover:text-blue-300 mb-8 inline-flex items-center">
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back to Home
         </Link>
@@ -68,110 +192,180 @@ export default function CreateGamePage() {
           <Card className="bg-gray-800/70 border-gray-700">
             <CardHeader>
               <CardTitle className="text-2xl text-center">
-                {gameCreated ? "Game Created!" : "Create Online Game"}
+                Setup Your Online Game
               </CardTitle>
               <CardDescription className="text-center text-gray-400">
-                {gameCreated ? "Share this code with your friends to join" : "Set up your online game parameters"}
+                Set up your game parameters for online play
               </CardDescription>
             </CardHeader>
             <CardContent>
               {error && (
-                <Alert variant="destructive" className="bg-red-900/30 border-red-900 text-red-300">
+                <Alert variant="destructive" className="mb-6 bg-red-900/30 border-red-900 text-red-300">
                   <AlertCircle className="h-4 w-4" />
                   <AlertDescription>{error}</AlertDescription>
                 </Alert>
               )}
 
-              {!gameCreated ? (
                 <div className="space-y-6">
                   <div className="space-y-2">
                     <Label htmlFor="playerName">Your Name</Label>
                     <Input
                       id="playerName"
-                      value={user?.name || user?.username || ""}
-                      disabled
+                    value={user?.name || user?.username || ""}
+                    disabled
                       className="bg-gray-700 border-gray-600"
                     />
                   </div>
 
                   <div className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <Label htmlFor="maxPlayers">Max Players: {maxPlayers}</Label>
-                      <div className="w-2/3">
-                        <Slider
-                          id="maxPlayers"
-                          min={MIN_PLAYERS}
-                          max={MAX_PLAYERS}
-                          step={1}
-                          value={[maxPlayers]}
-                          onValueChange={(value) => setMaxPlayers(value[0])}
-                        />
-                      </div>
-                    </div>
+                  <Label>Number of Players: {maxPlayers}</Label>
+                    <Slider
+                    value={[maxPlayers]}
+                    onValueChange={handleMaxPlayersChange}
+                    max={MAX_PLAYERS}
+                    min={MIN_PLAYERS}
+                      step={1}
+                      className="py-4"
+                    />
                   </div>
 
                   <div className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <Label htmlFor="roundTime">Round Time: {roundTime}s</Label>
-                      <div className="w-2/3">
-                        <Slider
-                          id="roundTime"
-                          min={30}
-                          max={180}
-                          step={10}
-                          value={[roundTime]}
-                          onValueChange={(value) => setRoundTime(value[0])}
-                        />
-                      </div>
-                    </div>
+                  <Label>Round Time: {roundTime} seconds</Label>
+                    <Slider
+                      value={[roundTime]}
+                      onValueChange={(value) => setRoundTime(value[0])}
+                    min={30}
+                    max={180}
+                    step={10}
+                      className="py-4"
+                    />
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="wordPack">Word Pack</Label>
-                    <Select value={wordPack} onValueChange={setWordPack}>
-                      <SelectTrigger id="wordPack" className="bg-gray-700 border-gray-600">
-                        <SelectValue placeholder="Select a word pack" />
+                  <Label htmlFor="wordPack">Word Pack</Label>
+                  <Select value={wordPack} onValueChange={setWordPack}>
+                    <SelectTrigger id="wordPack" className="bg-gray-700 border-gray-600">
+                      <SelectValue placeholder="Select a word pack" />
                       </SelectTrigger>
-                      <SelectContent className="bg-gray-700 border-gray-600">
-                        <SelectItem value="standard">Standard</SelectItem>
-                        <SelectItem value="food">Food</SelectItem>
-                        <SelectItem value="places">Places</SelectItem>
+                    <SelectContent className="bg-gray-700 border-gray-600">
+                      <SelectItem value="standard">Standard</SelectItem>
+                      <SelectItem value="food">Food</SelectItem>
+                      <SelectItem value="places">Places</SelectItem>
+                        <SelectItem value="animals">Animals</SelectItem>
+                      <SelectItem value="objects">Objects</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
 
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <Label htmlFor="numUndercovers">Undercovers: {numUndercovers}</Label>
-                      <div className="w-2/3">
-                        <Slider
-                          id="numUndercovers"
-                          min={1}
-                          max={3}
-                          step={1}
-                          value={[numUndercovers]}
-                          onValueChange={(value) => setNumUndercovers(value[0])}
-                        />
-                      </div>
-                    </div>
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-sm font-medium">Role Distribution</h3>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="h-4 w-4 text-gray-400" />
+                        </TooltipTrigger>
+                        <TooltipContent className="bg-gray-800 border-gray-700">
+                          <p>Adjust the number of special roles in your game</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   </div>
 
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <Label htmlFor="numMrWhites">Mr. Whites: {numMrWhites}</Label>
-                      <div className="w-2/3">
-                        <Slider
-                          id="numMrWhites"
-                          min={0}
-                          max={1}
-                          step={1}
-                          value={[numMrWhites]}
-                          onValueChange={(value) => setNumMrWhites(value[0])}
-                        />
-                      </div>
-                    </div>
+                  {/* Civilians Display */}
+                  <div className="bg-blue-500 px-8 py-1.5 rounded-full text-white !w-fit mx-auto">
+                    <span className="text-base font-semibold">
+                      {calculateCivilians()} Civilians
+                    </span>
                   </div>
 
+                  {/* Undercover and Mr. White Controls */}
+                  <div className="flex flex-col items-center gap-4">
+                    {/* Undercover Controls */}
+                    <div className="flex items-center gap-2">
+                      {numUndercovers > 1 ? (
+                  <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => handleUndercoverChange([Math.max(1, numUndercovers - 1)])}
+                          className="h-7 w-7 !rounded-full bg-black text-white hover:bg-black/80"
+                        >
+                          <Minus className="h-3 w-3" />
+                  </Button>
+                      ) : (
+                        <div className="h-7 w-7 invisible" />
+                      )}
+
+                      <div className="bg-black px-8 py-[7px] rounded-full text-white font-semibold">
+                        {numUndercovers} {numUndercovers === 1 ? 'Undercover' : 'Undercovers'}
+                </div>
+
+                      {numUndercovers + numMrWhites < maxPlayers - getMinCivilians(maxPlayers) && numUndercovers < getMaxUndercover(maxPlayers) ? (
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => handleUndercoverChange([numUndercovers + 1])}
+                          className="h-7 w-7 !rounded-full bg-black text-white hover:bg-black/80"
+                        >
+                          <Plus className="h-3 w-3" />
+                        </Button>
+                      ) : (
+                        <div className="h-7 w-7 invisible" />
+                      )}
+                    </div>
+
+                    {/* Mr. White Controls */}
+                    <div className="flex items-center gap-2">
+                      {numMrWhites > 0 ? (
+                      <Button
+                          variant="outline"
+                        size="icon"
+                          onClick={() => {
+                            if (numMrWhites <= 1) {
+                              setIncludeWhite(false);
+                              setNumMrWhites(0);
+                            } else {
+                              setNumMrWhites(numMrWhites - 1);
+                            }
+                          }}
+                          className="h-6 w-6 !rounded-full bg-white text-black hover:bg-white/80"
+                        >
+                          <Minus className="h-2.5 w-2.5" />
+                        </Button>
+                      ) : (
+                        <div className="h-6 w-6 invisible" />
+                      )}
+
+                      <div 
+                        className={`${includeWhite ? 'bg-white text-black' : 'bg-gray-600 text-gray-300'} px-8 py-1.5 rounded-full font-semibold`}
+                        onClick={() => {
+                          if (!includeWhite && maxPlayers > 4) {
+                            setIncludeWhite(true);
+                            setNumMrWhites(1);
+                          }
+                        }}
+                        style={{ cursor: maxPlayers > 4 ? 'pointer' : 'default' }}
+                      >
+                        {numMrWhites} {numMrWhites === 1 ? 'Mr. White' : 'Mr. Whites'}
+                      </div>
+
+                      {includeWhite && numUndercovers + numMrWhites < maxPlayers - getMinCivilians(maxPlayers) && numMrWhites < getMaxMrWhite(maxPlayers) ? (
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => handleMrWhiteChange([numMrWhites + 1])}
+                          className="h-6 w-6 !rounded-full bg-white text-black hover:bg-white/80"
+                        >
+                          <Plus className="h-2.5 w-2.5" />
+                      </Button>
+                      ) : (
+                        <div className="h-6 w-6 invisible" />
+                      )}
+                    </div>
+                  </div>
+                  </div>
+
+                <div className="pt-4">
                   <Button
                     onClick={handleCreateGame}
                     className="w-full bg-purple-600 hover:bg-purple-700"
@@ -187,39 +381,7 @@ export default function CreateGamePage() {
                     )}
                   </Button>
                 </div>
-              ) : (
-                <div className="space-y-6">
-                  <div className="p-4 bg-gray-700/50 rounded-lg border border-gray-600 text-center">
-                    <p className="text-sm text-gray-400 mb-2">Game Code</p>
-                    <div className="flex items-center justify-center">
-                      <span className="text-3xl font-mono tracking-wider">{gameCode}</span>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => {
-                          navigator.clipboard.writeText(gameCode);
-                          toast({
-                            title: "Game Code Copied",
-                            description: "The game code has been copied to your clipboard.",
-                          });
-                        }}
-                        className="ml-2 text-gray-400 hover:text-white"
-                      >
-                        <Copy className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-center space-x-2 text-gray-400">
-                    <Users className="h-5 w-5" />
-                    <span>Waiting for players (1/{maxPlayers})</span>
-                  </div>
-
-                  <Button onClick={() => navigate(`/game/${gameCode}`)} className="w-full bg-red-600 hover:bg-red-700">
-                    Start Game
-                  </Button>
-                </div>
-              )}
+              </div>
             </CardContent>
           </Card>
         </div>

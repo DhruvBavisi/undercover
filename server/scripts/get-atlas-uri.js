@@ -38,7 +38,7 @@ rl.question('Enter your MongoDB Atlas username: ', (answer) => {
         
         console.log('\nYour MongoDB Atlas connection string:');
         console.log(connectionString);
-        console.log('\nAdd this to your .env file as MONGO_ATLAS_URI');
+        console.log('\nAdd this to your .env file as MONGODB_URI');
         
         rl.close();
       });

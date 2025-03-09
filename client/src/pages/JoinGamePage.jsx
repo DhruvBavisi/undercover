@@ -6,17 +6,18 @@ import { useGameRoom } from '../context/GameRoomContext';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
-import { ArrowLeft, Loader2 } from 'lucide-react';
+import { ArrowLeft, Loader2, AlertCircle } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../components/ui/card';
 import { Alert, AlertDescription } from '../components/ui/alert';
 
 export default function JoinGamePage() {
   const { isAuthenticated } = useAuth();
-  const { join, loading, error } = useGameRoom();
+  const { join, loading, error, room } = useGameRoom();
   const navigate = useNavigate();
   
   const [roomCode, setRoomCode] = useState('');
   const [formError, setFormError] = useState('');
+  const [isJoining, setIsJoining] = useState(false);
   
   // Redirect if not authenticated
   useEffect(() => {
@@ -24,6 +25,14 @@ export default function JoinGamePage() {
       navigate('/login');
     }
   }, [isAuthenticated, navigate]);
+  
+  // Redirect to game page if successfully joined a room
+  useEffect(() => {
+    if (room && room.roomCode) {
+      console.log('Successfully joined room, redirecting to game page');
+      navigate(`/game/${room.roomCode}`);
+    }
+  }, [room, navigate]);
   
   const handleJoinGame = async (e) => {
     e.preventDefault();
@@ -34,10 +43,23 @@ export default function JoinGamePage() {
       return;
     }
     
-    setFormError('');
+    if (roomCode.length !== 6) {
+      setFormError('Game code must be 6 characters');
+      return;
+    }
     
-    // Call the join function from GameRoomContext
-    await join(roomCode);
+    setFormError('');
+    setIsJoining(true);
+    
+    try {
+      // Call the join function from GameRoomContext
+      await join(roomCode);
+    } catch (err) {
+      console.error('Error joining game:', err);
+      setFormError('Failed to join game. Please try again.');
+    } finally {
+      setIsJoining(false);
+    }
   };
   
   if (!isAuthenticated) {
@@ -51,7 +73,12 @@ export default function JoinGamePage() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 text-white p-4">
       <div className="container mx-auto max-w-md">
-        <Card className="bg-gray-800 border-gray-700">
+        <Link to="/" className="text-blue-400 hover:text-blue-300 mb-8 inline-flex items-center">
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Back to Home
+        </Link>
+        
+        <Card className="bg-gray-800 border-gray-700 mt-4">
           <CardHeader>
             <CardTitle className="text-2xl font-bold">Join Online Game</CardTitle>
             <CardDescription className="text-gray-400">
@@ -90,9 +117,9 @@ export default function JoinGamePage() {
               <Button 
                 type="submit" 
                 className="w-full bg-blue-600 hover:bg-blue-700"
-                disabled={loading}
+                disabled={loading || isJoining}
               >
-                {loading ? (
+                {loading || isJoining ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Joining...

@@ -1,19 +1,27 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useGameRoom } from '../context/GameRoomContext';
 import { Button } from '../components/ui/button';
-import { Card, CardContent } from '../components/ui/card';
-import { Loader2, Copy, ArrowLeft, Users } from 'lucide-react';
+import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
+import { Slider } from '../components/ui/slider';
+import { Loader2, Copy, ArrowLeft, Users, X } from 'lucide-react';
 import { useToast } from '../hooks/use-toast';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../components/ui/tooltip';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '../components/ui/card';
+import { API_URL } from '../config';
 
 export default function GamePage() {
   const { gameCode } = useParams();
   const navigate = useNavigate();
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, user, token } = useAuth();
   const { room, loading, error, fetchRoom, setReady, leave, isHost, isPlayerReady, startGame } = useGameRoom();
   const { toast } = useToast();
   const [initialFetchDone, setInitialFetchDone] = useState(false);
+  const [isRedirecting, setIsRedirecting] = useState(false);
+  const redirectTimeoutRef = useRef(null);
   
   // Fetch room details when component mounts - with useCallback to prevent unnecessary re-renders
   const fetchGameRoom = useCallback(async () => {
@@ -39,6 +47,42 @@ export default function GamePage() {
     fetchGameRoom();
   }, [fetchGameRoom]);
   
+  // Redirect to online game page if game is in progress
+  useEffect(() => {
+    if (room && !isRedirecting) {
+      console.log('Room status check for redirection:', room.status);
+      
+      if (room.status === 'in-progress') {
+        console.log('Game is in progress, redirecting to online game page...');
+        
+        // Prevent multiple redirects
+        setIsRedirecting(true);
+        
+        // Clear any existing timeout
+        if (redirectTimeoutRef.current) {
+          clearTimeout(redirectTimeoutRef.current);
+        }
+        
+        // Set a timeout to navigate after a short delay
+        redirectTimeoutRef.current = setTimeout(() => {
+          navigate(`/online-game/${gameCode}`);
+          
+          // Reset the redirecting state after navigation
+          setTimeout(() => {
+            setIsRedirecting(false);
+          }, 1000);
+        }, 500);
+      }
+    }
+    
+    // Cleanup function to clear timeout if component unmounts
+    return () => {
+      if (redirectTimeoutRef.current) {
+        clearTimeout(redirectTimeoutRef.current);
+      }
+    };
+  }, [room, navigate, gameCode]);
+  
   // Copy game code to clipboard
   const copyGameCode = () => {
     navigator.clipboard.writeText(gameCode);
@@ -56,12 +100,69 @@ export default function GamePage() {
   // Handle leave game
   const handleLeaveGame = () => {
     leave();
-    navigate('/');
   };
   
   // Handle start game (host only)
   const handleStartGame = () => {
+    console.log('Start game button clicked');
+    
+    // Prevent multiple clicks
+    if (isRedirecting) {
+      console.log('Already processing start game request');
+      return;
+    }
+    
+    // Check if we're the host
+    if (!isHost()) {
+      console.error('Only the host can start the game');
+      toast({
+        title: "Cannot Start Game",
+        description: "Only the host can start the game.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // Check if all players are ready
+    if (!room.players.every(p => p.isReady)) {
+      console.error('All players must be ready to start the game');
+      toast({
+        title: "Cannot Start Game",
+        description: "All players must be ready to start the game.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // Check if we have enough players
+    if (room.players.length < 3) {
+      console.error('Need at least 3 players to start the game');
+      toast({
+        title: "Cannot Start Game",
+        description: "You need at least 3 players to start the game.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // Set redirecting state to prevent multiple clicks
+    setIsRedirecting(true);
+    
+    console.log('All checks passed, starting game...');
     startGame();
+    
+    // Show a toast to indicate the game is starting
+    toast({
+      title: "Starting Game",
+      description: "The game is starting. Please wait...",
+    });
+    
+    // If we don't get redirected within 5 seconds, reset the state
+    setTimeout(() => {
+      if (isRedirecting) {
+        setIsRedirecting(false);
+      }
+    }, 5000);
   };
   
   // Show loading state only on initial fetch
@@ -110,7 +211,7 @@ export default function GamePage() {
   if (room) {
     // Game is in waiting state
     if (room.status === 'waiting') {
-      return (
+  return (
         <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 text-white p-4">
           <div className="container mx-auto max-w-md">
             <div className="flex justify-between items-center mb-8">
@@ -147,13 +248,57 @@ export default function GamePage() {
                   </div>
                   
                   {isHost() && (
-                    <Button 
-                      onClick={handleStartGame}
-                      disabled={room.players.length < 3 || !room.players.every(p => p.isReady)}
-                      className="bg-green-600 hover:bg-green-700"
-                    >
-                      Start Game
-                    </Button>
+                    <div>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div>
+                              <Button 
+                                onClick={handleStartGame}
+                                disabled={room.players.length < 3 || !room.players.every(p => p.isReady) || isRedirecting}
+                                className="bg-green-600 hover:bg-green-700 px-6 py-2 font-bold"
+                                size="lg"
+                              >
+                                {isRedirecting ? (
+                                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Starting...</>
+                                ) : room.players.length < 3 ? (
+                                  <>Need {3 - room.players.length} More</>
+                                ) : !room.players.every(p => p.isReady) ? (
+                                  <>Waiting for Ready</>
+                                ) : (
+                                  <>Start Game</>
+                                )}
+                              </Button>
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent className="bg-gray-800 border-gray-700 p-3 max-w-xs">
+                            <p>
+                              {room.players.length < 3 ? (
+                                <>You need at least 3 players to start the game.</>
+                              ) : !room.players.every(p => p.isReady) ? (
+                                <>All players must be ready before you can start the game.</>
+                              ) : (
+                                <>You're ready to start! Click to begin the game.</>
+                              )}
+                            </p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                      
+                      {/* Fallback button for direct navigation */}
+                      <div className="mt-2 text-center">
+                        <Button
+                          variant="link"
+                          className="text-xs text-gray-400 hover:text-white"
+                          onClick={() => {
+                            setIsRedirecting(true);
+                            navigate(`/online-game/${gameCode}`);
+                          }}
+                        >
+                          Having trouble? Click here to go to game page directly
+                        </Button>
+                      </div>
+                    </div>
                   )}
                 </div>
                 
@@ -184,6 +329,54 @@ export default function GamePage() {
                         }`}>
                           {player.isReady ? 'Ready' : 'Not Ready'}
                         </span>
+                        
+                        {/* Remove player button (host only) */}
+                        {isHost() && player.userId !== user.id && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="ml-2 text-red-400 hover:text-red-300 hover:bg-red-900/20"
+                            onClick={() => {
+                              if (confirm(`Are you sure you want to remove ${player.name} from the game?`)) {
+                                // Call API to remove player
+                                fetch(`${API_URL}/api/game-rooms/rooms/${room.roomCode}/remove-player`, {
+                                  method: 'POST',
+                                  headers: {
+                                    'Content-Type': 'application/json',
+                                    'Authorization': `Bearer ${token}`
+                                  },
+                                  body: JSON.stringify({ playerId: player.userId })
+                                })
+                                .then(response => response.json())
+                                .then(data => {
+                                  if (data.success) {
+                                    toast({
+                                      title: "Player Removed",
+                                      description: `${player.name} has been removed from the game.`,
+                                      variant: "default"
+                                    });
+                                  } else {
+                                    toast({
+                                      title: "Error",
+                                      description: data.message || "Failed to remove player",
+                                      variant: "destructive"
+                                    });
+                                  }
+                                })
+                                .catch(err => {
+                                  console.error('Error removing player:', err);
+                                  toast({
+                                    title: "Error",
+                                    description: "Failed to remove player",
+                                    variant: "destructive"
+                                  });
+                                });
+                              }
+                            }}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -193,142 +386,42 @@ export default function GamePage() {
             
             <Button 
               onClick={toggleReady}
+              disabled={isRedirecting}
               className={`w-full ${
                 isPlayerReady() ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'
               }`}
             >
-              {isPlayerReady() ? 'Not Ready' : 'Ready'}
+              {isRedirecting ? (
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Please wait...</>
+              ) : isPlayerReady() ? (
+                'Not Ready'
+              ) : (
+                'Ready'
+              )}
             </Button>
           </div>
-        </div>
+                </div>
       );
     }
     
-    // Game is in progress
+    // If game is in progress, we should be redirected by the useEffect
+    // This is a fallback in case the redirect doesn't happen
     if (room.status === 'in-progress') {
       return (
-        <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 text-white p-4">
-          <div className="container mx-auto max-w-md">
-            <Card className="bg-gray-800 border-gray-700">
-              <CardContent className="p-6">
-                <h1 className="text-2xl font-bold mb-6 text-center">Game In Progress</h1>
-                
-                {/* Display player's role and word */}
-                <div className="bg-gray-700 p-4 rounded-lg mb-6">
-                  <h2 className="text-lg font-semibold mb-2">Your Role</h2>
-                  <div className="bg-gray-800 p-4 rounded-lg text-center">
-                    <p className="text-xl font-bold mb-2">
-                      {room.playerRole === 'civilian' && 'Civilian'}
-                      {room.playerRole === 'undercover' && 'Undercover'}
-                      {room.playerRole === 'mrwhite' && 'Mr. White'}
-                    </p>
-                    {room.playerRole !== 'mrwhite' && (
-                      <p className="text-2xl font-mono">
-                        Your word: <span className="text-blue-400">{room.playerWord}</span>
-                      </p>
-                    )}
-                    {room.playerRole === 'mrwhite' && (
-                      <p className="text-gray-400 italic">
-                        You don't know the word. Try to figure it out!
-                      </p>
-                    )}
-                  </div>
-                </div>
-
-                {/* Game instructions based on role */}
-                <div className="bg-gray-700/50 p-4 rounded-lg mb-6">
-                  <h3 className="font-semibold mb-2">Instructions:</h3>
-                  {room.playerRole === 'civilian' && (
-                    <p className="text-sm text-gray-300">
-                      Describe your word without saying it directly. Try to identify who the Undercover and Mr. White are.
-                    </p>
-                  )}
-                  {room.playerRole === 'undercover' && (
-                    <p className="text-sm text-gray-300">
-                      You have a similar but different word. Blend in with the Civilians while trying to identify other Undercovers.
-                    </p>
-                  )}
-                  {room.playerRole === 'mrwhite' && (
-                    <p className="text-sm text-gray-300">
-                      You don't know the word. Listen carefully and try to guess what it might be. Blend in with your descriptions.
-                    </p>
-                  )}
-                </div>
-                
-                {/* Player list */}
-                <h3 className="font-semibold mb-2">Players:</h3>
-                <div className="space-y-2 mb-6">
-                  {room.players.map((player) => (
-                    <div 
-                      key={player.userId} 
-                      className={`flex items-center justify-between p-3 rounded-lg ${
-                        !player.isAlive ? 'bg-red-900/30 opacity-60' : 'bg-gray-700/30'
-                      }`}
-                    >
-                      <div className="flex items-center">
-                        <div className="h-8 w-8 rounded-full bg-blue-600 flex items-center justify-center mr-3">
-                          {player.name.charAt(0).toUpperCase()}
-                        </div>
-                        <p className="font-medium">{player.name}</p>
-                      </div>
-                      
-                      {!player.isAlive && (
-                        <span className="text-xs bg-red-600 px-2 py-1 rounded">Eliminated</span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-                
-                <Button 
-                  onClick={handleLeaveGame}
-                  variant="outline"
-                  className="w-full border-red-600 text-red-400 hover:bg-red-900/20"
-                >
-                  Leave Game
-                </Button>
-              </CardContent>
-            </Card>
+        <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 text-white flex items-center justify-center">
+          <div className="text-center">
+            <Loader2 className="h-8 w-8 animate-spin text-blue-500 mx-auto mb-4" />
+            <p className="text-gray-400">Game in progress, redirecting...</p>
+                  <Button
+              onClick={() => navigate(`/online-game/${gameCode}`)}
+              className="mt-4 bg-blue-600 hover:bg-blue-700"
+                  >
+              Go to Game
+                  </Button>
           </div>
         </div>
       );
     }
-    
-    // Game is completed
-    return (
-      <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 text-white p-4">
-        <div className="container mx-auto max-w-md">
-          <Card className="bg-gray-800 border-gray-700">
-            <CardContent className="p-6">
-              <h1 className="text-2xl font-bold mb-6 text-center">Game Over</h1>
-              
-              <div className="bg-gray-700 p-4 rounded-lg mb-6 text-center">
-                <h2 className="text-lg font-semibold mb-2">Winner</h2>
-                <p className="text-2xl font-bold">
-                  {room.winner === 'civilians' && 'Civilians Win!'}
-                  {room.winner === 'undercovers' && 'Undercovers Win!'}
-                  {room.winner === 'mrwhite' && 'Mr. White Wins!'}
-                </p>
-              </div>
-              
-              <Button 
-                onClick={() => navigate('/')}
-                className="w-full bg-blue-600 hover:bg-blue-700 mb-3"
-              >
-                Back to Home
-              </Button>
-              
-              <Button 
-                onClick={handleLeaveGame}
-                variant="outline"
-                className="w-full border-gray-600 text-gray-400 hover:bg-gray-700/50"
-              >
-                Leave Game
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    );
   }
   
   // Fallback loading state

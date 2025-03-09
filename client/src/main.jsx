@@ -19,6 +19,7 @@ import { ThemeProvider } from './components/theme-provider.jsx';
 import { AuthProvider } from './context/AuthContext.jsx';
 import { SocketProvider } from './context/SocketContext.jsx';
 import { GameRoomProvider } from './context/GameRoomContext.jsx';
+import OnlineGamePage from './pages/OnlineGamePage.jsx';
 
 // Create a wrapper component that includes all providers except RouterProvider
 const AppProviders = ({ children }) => {
@@ -68,6 +69,14 @@ const router = createBrowserRouter([
         element: (
           <GameRoomProvider>
             <GamePage />
+          </GameRoomProvider>
+        )
+      },
+      { 
+        path: 'online-game/:gameCode', 
+        element: (
+          <GameRoomProvider>
+            <OnlineGamePage />
           </GameRoomProvider>
         )
       },

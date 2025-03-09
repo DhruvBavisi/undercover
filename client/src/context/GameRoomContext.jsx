@@ -1,15 +1,17 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 import { useSocket } from './SocketContext.jsx';
+import { useToast } from '../hooks/use-toast';
 import { 
   createGameRoom, 
   joinGameRoom, 
   getGameRoom, 
   updateReadyStatus, 
   leaveGameRoom, 
-  updateGameSettings 
+  updateGameSettings
 } from '../services/gameRoom';
+import { API_URL } from '../config';
 
 // Create context
 const GameRoomContext = createContext();
@@ -21,6 +23,7 @@ export const useGameRoom = () => useContext(GameRoomContext);
 export const GameRoomProvider = ({ children }) => {
   const { user, token, isAuthenticated } = useAuth();
   const socket = useSocket();
+  const toast = useToast();
   
   // Use try-catch to handle cases where this component might be rendered outside of a Router
   let navigate;
@@ -41,25 +44,109 @@ export const GameRoomProvider = ({ children }) => {
   const [playerRole, setPlayerRole] = useState(null);
   const [playerWord, setPlayerWord] = useState(null);
   
-  // Connect to socket events when room changes
-  useEffect(() => {
-    if (!socket || !room) return;
+  // Refs for debouncing and preventing race conditions
+  const updateTimeoutRef = useRef(null);
+  const lastRoomUpdateRef = useRef(null);
+  const isRedirectingRef = useRef(false);
+  
+  // Debounced room update function
+  const debouncedSetRoom = useCallback((updatedRoom) => {
+    // Clear any existing timeout
+    if (updateTimeoutRef.current) {
+      clearTimeout(updateTimeoutRef.current);
+    }
     
-    console.log('Setting up socket connection for room:', room.roomCode);
+    // Set a new timeout
+    updateTimeoutRef.current = setTimeout(() => {
+      // Only update if the room data has actually changed
+      if (JSON.stringify(lastRoomUpdateRef.current) !== JSON.stringify(updatedRoom)) {
+        console.log('Updating room state with debounced data:', updatedRoom?.roomCode);
+        setRoom(updatedRoom);
+        lastRoomUpdateRef.current = updatedRoom;
+      }
+    }, 300); // 300ms debounce time
+  }, []);
+  
+  // Set up socket listeners when room changes
+  useEffect(() => {
+    if (!socket || !room || !user) {
+      console.log('Socket, room, or user not available yet', { 
+        socketExists: !!socket, 
+        roomExists: !!room, 
+        userExists: !!user 
+      });
+      return;
+    }
+
+    console.log('Setting up socket listeners for room:', room.roomCode);
+    
+    // Ensure socket is connected
+    if (!socket.connected) {
+      console.log('Socket not connected, connecting now...');
+      socket.connect();
+    }
     
     // Join the socket room
+    console.log('Joining socket room:', room.roomCode);
     socket.emit('join-room', { roomCode: room.roomCode, userId: user?.id });
     
     // Listen for room updates
     const handleRoomUpdate = (updatedRoom) => {
-      console.log('Room updated via socket:', updatedRoom);
-      setRoom(updatedRoom);
+      console.log('Room updated via socket:', updatedRoom?.roomCode);
+      
+      // Use the debounced update function
+      debouncedSetRoom(updatedRoom);
     };
     
     // Listen for game start
     const handleGameStart = (gameData) => {
       console.log('Game started via socket:', gameData);
-      setRoom(prev => ({ ...prev, ...gameData }));
+      
+      // Update room with game data
+      debouncedSetRoom(prev => {
+        const updatedRoom = { ...prev, ...gameData };
+        return updatedRoom;
+      });
+      
+      // Handle navigation to game page
+      if (gameData.status === 'in-progress' && !isRedirectingRef.current) {
+        isRedirectingRef.current = true;
+        console.log('Game is in progress, will redirect to online game page...');
+        
+        // Slight delay to ensure state is updated before navigation
+        setTimeout(() => {
+          navigate(`/online-game/${room.roomCode}`);
+          // Reset the redirecting flag after navigation
+          setTimeout(() => {
+            isRedirectingRef.current = false;
+          }, 1000);
+        }, 500);
+      }
+    };
+    
+    // Listen for player left event
+    const handlePlayerLeft = (data) => {
+      console.log('Player left the room:', data);
+      
+      // Update room with new player list
+      debouncedSetRoom(prev => {
+        if (!prev) return prev;
+        
+        // Show toast notification
+        if (toast) {
+          toast({
+            title: "Player Left",
+            description: `${data.name} has left the game.`,
+            variant: "default"
+          });
+        }
+        
+        return {
+          ...prev,
+          players: data.players,
+          hostId: data.hostId
+        };
+      });
     };
     
     // Listen for role assignment
@@ -79,6 +166,7 @@ export const GameRoomProvider = ({ children }) => {
     // Set up event listeners
     socket.on('room-updated', handleRoomUpdate);
     socket.on('game-started', handleGameStart);
+    socket.on('player-left', handlePlayerLeft);
     socket.on(`role-${user?.id}`, handleRoleAssignment);
     socket.on('error', handleError);
     
@@ -87,22 +175,24 @@ export const GameRoomProvider = ({ children }) => {
       console.log('Cleaning up socket listeners');
       socket.off('room-updated', handleRoomUpdate);
       socket.off('game-started', handleGameStart);
+      socket.off('player-left', handlePlayerLeft);
       socket.off(`role-${user?.id}`, handleRoleAssignment);
       socket.off('error', handleError);
     };
-  }, [socket, room, user]);
+  }, [socket, room?.roomCode, user?.id, navigate, debouncedSetRoom]);
   
   // Create a new game room
   const create = async (settings = {}) => {
     if (!isAuthenticated) {
-      console.log('User not authenticated, redirecting to login');
-      navigate('/login');
+      console.error('User not authenticated');
+      setError('You must be logged in to create a game');
+      setTimeout(() => navigate('/login'), 2000);
       return;
     }
     
     if (!token) {
       console.error('No authentication token available');
-      setError('Authentication required. Please log in again.');
+      setError('Authentication error. Please log in again.');
       setTimeout(() => navigate('/login'), 2000);
       return;
     }
@@ -112,26 +202,18 @@ export const GameRoomProvider = ({ children }) => {
     
     try {
       console.log('Creating game room with settings:', settings);
-      const result = await createGameRoom(token, settings);
+      const response = await createGameRoom(token, settings);
       
-      if (result.success) {
-        console.log('Game room created successfully:', result.room);
-        setRoom(result.room);
-        
-        // Navigate to the game page
-        navigate(`/game/${result.room.roomCode}`);
-        
-        // Return the room code for use in the component
-        return result.room.roomCode;
+      if (response.success) {
+        console.log('Game room created successfully:', response.room);
+        debouncedSetRoom(response.room);
       } else {
-        console.error('Failed to create game room:', result.message);
-        setError(result.message);
-        return null;
+        console.error('Failed to create game room:', response.message);
+        setError(response.message || 'Failed to create game room');
       }
     } catch (err) {
-      console.error('Exception in create:', err);
-      setError(`Failed to create game room: ${err.message}`);
-      return null;
+      console.error('Error creating game room:', err);
+      setError('An error occurred while creating the game room');
     } finally {
       setLoading(false);
     }
@@ -140,7 +222,16 @@ export const GameRoomProvider = ({ children }) => {
   // Join an existing game room
   const join = async (roomCode) => {
     if (!isAuthenticated) {
-      navigate('/login');
+      console.error('User not authenticated');
+      setError('You must be logged in to join a game');
+      setTimeout(() => navigate('/login'), 2000);
+      return;
+    }
+    
+    if (!token) {
+      console.error('No authentication token available');
+      setError('Authentication error. Please log in again.');
+      setTimeout(() => navigate('/login'), 2000);
       return;
     }
     
@@ -148,25 +239,26 @@ export const GameRoomProvider = ({ children }) => {
     setError(null);
     
     try {
-      const result = await joinGameRoom(token, roomCode);
+      console.log('Joining game room:', roomCode);
+      const response = await joinGameRoom(token, roomCode);
       
-      if (result.success) {
-        setRoom(result.room);
-        navigate(`/game/${result.room.roomCode}`);
+      if (response.success) {
+        console.log('Joined game room successfully:', response.room);
+        debouncedSetRoom(response.room);
       } else {
-        setError(result.message);
+        console.error('Failed to join game room:', response.message);
+        setError(response.message || 'Failed to join game room');
       }
     } catch (err) {
-      setError('Failed to join game room');
-      console.error(err);
+      console.error('Error joining game room:', err);
+      setError('An error occurred while joining the game room');
     } finally {
       setLoading(false);
     }
   };
   
-  // Fetch game room details with debounce to prevent multiple rapid calls
-  const fetchRoomTimeoutRef = React.useRef(null);
-  const fetchRoom = async (roomCode) => {
+  // Fetch a game room by code
+  const fetchRoom = useCallback(async (roomCode) => {
     if (!isAuthenticated) {
       console.log('User not authenticated, redirecting to login');
       navigate('/login');
@@ -175,131 +267,128 @@ export const GameRoomProvider = ({ children }) => {
     
     if (!token) {
       console.error('No authentication token available');
-      setError('Authentication required. Please log in again.');
+      setError('Authentication error. Please log in again.');
       setTimeout(() => navigate('/login'), 2000);
       return;
     }
     
-    // Clear any existing timeout to prevent multiple rapid calls
-    if (fetchRoomTimeoutRef.current) {
-      clearTimeout(fetchRoomTimeoutRef.current);
-    }
+    setLoading(true);
+    setError(null);
     
-    // Set a small delay to prevent flickering
-    fetchRoomTimeoutRef.current = setTimeout(async () => {
-      setLoading(true);
-      setError(null);
+    try {
+      console.log(`Fetching game room with code: ${roomCode}`);
+      const response = await getGameRoom(token, roomCode);
       
-      try {
-        console.log(`Fetching room with code: ${roomCode}, token available: ${!!token}`);
-        const result = await getGameRoom(token, roomCode);
-        
-        if (result.success) {
-          console.log('Room fetched successfully:', result.room);
-          setRoom(result.room);
-        } else {
-          console.error('Failed to fetch room:', result.message);
-          setError(result.message);
-          
-          // If the error is related to authentication, redirect to login
-          if (result.message.includes('Authentication') || result.message.includes('token')) {
-            setTimeout(() => navigate('/login'), 2000);
-          }
-        }
-      } catch (err) {
-        console.error('Exception in fetchRoom:', err);
-        setError(`Failed to fetch game room: ${err.message}`);
-      } finally {
-        setLoading(false);
-        fetchRoomTimeoutRef.current = null;
+      if (response.success) {
+        console.log('Game room fetched successfully:', response.room);
+        debouncedSetRoom(response.room);
+      } else {
+        console.error('Failed to fetch game room:', response.message);
+        setError(response.message || 'Failed to fetch game room');
       }
-    }, 300); // 300ms delay to debounce
-  };
+    } catch (err) {
+      console.error('Error fetching game room:', err);
+      setError('An error occurred while fetching the game room');
+    } finally {
+      setLoading(false);
+    }
+  }, [isAuthenticated, token, navigate, debouncedSetRoom]);
   
-  // Update player ready status
+  // Set player ready status
   const setReady = async (isReady) => {
-    if (!room) return;
-    
-    setLoading(true);
-    setError(null);
+    if (!room || !token) return;
     
     try {
-      const result = await updateReadyStatus(token, room.roomCode, isReady);
+      console.log(`Setting player ready status to: ${isReady}`);
+      const response = await updateReadyStatus(token, room.roomCode, isReady);
       
-      if (result.success) {
-        setRoom(result.room);
+      if (response.success) {
+        console.log('Ready status updated successfully');
       } else {
-        setError(result.message);
+        console.error('Failed to update ready status:', response.message);
+        setError(response.message || 'Failed to update ready status');
       }
     } catch (err) {
-      setError('Failed to update ready status');
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-    
-    // Also emit socket event for real-time updates
-    if (socket) {
-      socket.emit('player-ready', { 
-        roomCode: room.roomCode, 
-        userId: user?.id, 
-        isReady 
-      });
+      console.error('Error updating ready status:', err);
+      setError('An error occurred while updating ready status');
     }
   };
   
-  // Leave the current game room
+  // Leave the game room
   const leave = async () => {
-    if (!room) return;
-    
-    setLoading(true);
-    setError(null);
+    if (!room || !token) return;
     
     try {
-      await leaveGameRoom(token, room.roomCode);
-      setRoom(null);
-      setPlayerRole(null);
-      setPlayerWord(null);
-      navigate('/');
+      console.log('Leaving game room:', room.roomCode);
+      const response = await leaveGameRoom(token, room.roomCode);
+      
+      if (response.success) {
+        console.log('Left game room successfully');
+        debouncedSetRoom(null);
+        setPlayerRole(null);
+        setPlayerWord(null);
+        navigate('/');
+      } else {
+        console.error('Failed to leave game room:', response.message);
+        setError(response.message || 'Failed to leave game room');
+      }
     } catch (err) {
-      setError('Failed to leave game room');
-      console.error(err);
-    } finally {
-      setLoading(false);
+      console.error('Error leaving game room:', err);
+      setError('An error occurred while leaving the game room');
     }
   };
   
-  // Update game settings (host only)
+  // Update game room settings (host only)
   const updateSettings = async (settings) => {
-    if (!room) return;
-    
-    setLoading(true);
-    setError(null);
+    if (!room || !token) return;
     
     try {
-      const result = await updateGameSettings(token, room.roomCode, settings);
+      console.log('Updating game room settings:', settings);
+      const response = await updateGameSettings(token, room.roomCode, settings);
       
-      if (result.success) {
-        setRoom(result.room);
+      if (response.success) {
+        console.log('Settings updated successfully');
       } else {
-        setError(result.message);
+        console.error('Failed to update settings:', response.message);
+        setError(response.message || 'Failed to update settings');
       }
     } catch (err) {
-      setError('Failed to update game settings');
-      console.error(err);
-    } finally {
-      setLoading(false);
+      console.error('Error updating settings:', err);
+      setError('An error occurred while updating settings');
     }
   };
   
   // Start the game (host only)
   const startGame = () => {
-    if (!room || !socket) return;
+    console.log('startGame called, room:', room?.roomCode, 'socket connected:', !!socket);
+    
+    if (!room || !socket) {
+      console.error('Cannot start game: room or socket is missing', { 
+        roomExists: !!room, 
+        socketExists: !!socket 
+      });
+      return;
+    }
+    
+    console.log('Emitting start-game event with data:', { 
+      roomCode: room.roomCode, 
+      userId: user?.id 
+    });
+    
+    // Set a flag to indicate we're trying to start the game
+    isRedirectingRef.current = true;
     
     socket.emit('start-game', { 
       roomCode: room.roomCode, 
       userId: user?.id 
     });
+    
+    // If we don't get a response within 3 seconds, reset the flag
+    setTimeout(() => {
+      if (isRedirectingRef.current) {
+        isRedirectingRef.current = false;
+      }
+    }, 3000);
   };
   
   // Check if the current user is the host
@@ -316,10 +405,9 @@ export const GameRoomProvider = ({ children }) => {
   
   // Reset the game room state
   const resetState = () => {
-    setRoom(null);
+    debouncedSetRoom(null);
     setPlayerRole(null);
     setPlayerWord(null);
-    setError(null);
   };
   
   // Context value
