@@ -27,6 +27,7 @@ const allowedOrigins = [
   process.env.CLIENT_URL,
   'https://undercover-8jswt6ept-dhruvs-projects-5a6d3e4b.vercel.app',
   'https://undercover-game.vercel.app',
+  'https://undercover-one.vercel.app',
   // Development origins
   'http://localhost:5173',
   'http://localhost:5174',
@@ -43,34 +44,67 @@ app.use(cors({
     // Allow requests with no origin (like mobile apps, curl, etc.)
     if (!origin) return callback(null, true);
     
-    if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV !== 'production') {
-      callback(null, true);
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, origin);
     } else {
       console.warn(`HTTP origin not allowed by CORS: ${origin}`);
-      callback(null, true); // Allow all origins in case of issues
+      // In development, allow all origins
+      if (process.env.NODE_ENV !== 'production') {
+        callback(null, origin);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
     }
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  credentials: true
+  credentials: true,
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 // Add CORS headers for preflight requests
-app.options('*', cors());
+app.options('*', cors({
+  origin: function(origin, callback) {
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, origin);
+    } else {
+      // In development, allow all origins
+      if (process.env.NODE_ENV !== 'production') {
+        callback(null, origin);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 
-// Add headers to all responses
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-  next();
-});
+// Remove the middleware that sets * for Access-Control-Allow-Origin
+// as it conflicts with credentials mode
 
 app.use(express.json());
 
 // Configure Socket.io with appropriate CORS
 const io = new Server(server, {
   cors: {
-    origin: '*', // Allow all origins for socket.io
+    origin: function(origin, callback) {
+      if (!origin) return callback(null, true);
+      
+      if (allowedOrigins.indexOf(origin) !== -1) {
+        callback(null, origin);
+      } else {
+        // In development, allow all origins
+        if (process.env.NODE_ENV !== 'production') {
+          callback(null, origin);
+        } else {
+          console.warn(`Socket.io origin not allowed by CORS: ${origin}`);
+          callback(new Error('Not allowed by CORS'));
+        }
+      }
+    },
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     credentials: true
   },
@@ -619,4 +653,4 @@ process.on('uncaughtException', (err) => {
 });
 
 // Export the Express app for Vercel serverless deployment
-export { app as default };
+export default app;

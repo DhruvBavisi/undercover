@@ -1,155 +1,171 @@
 import { API_URL } from '../config';
 
 // Create a new game room
-export const createGameRoom = async (token, settings = {}) => {
+export const createRoom = async (token) => {
   try {
+    console.log('Creating room with API URL:', `${API_URL}/api/game-rooms/rooms`);
     const response = await fetch(`${API_URL}/api/game-rooms/rooms`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`
       },
-      body: JSON.stringify({ settings })
+      credentials: 'include'
     });
-    
-    const data = await response.json();
-    return data;
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Failed to create room');
+    }
+
+    return await response.json();
   } catch (error) {
-    console.error('Error creating game room:', error);
-    return { success: false, message: 'Failed to create game room' };
+    console.error('Error creating room:', error);
+    throw error;
   }
 };
 
 // Join a game room
-export const joinGameRoom = async (token, roomCode) => {
+export const joinRoom = async (roomCode, token) => {
   try {
+    console.log('Joining room with API URL:', `${API_URL}/api/game-rooms/rooms/join`);
     const response = await fetch(`${API_URL}/api/game-rooms/rooms/join`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`
       },
-      body: JSON.stringify({ roomCode })
+      body: JSON.stringify({ roomCode }),
+      credentials: 'include'
     });
-    
-    const data = await response.json();
-    return data;
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Failed to join room');
+    }
+
+    return await response.json();
   } catch (error) {
-    console.error('Error joining game room:', error);
-    return { success: false, message: 'Failed to join game room' };
+    console.error('Error joining room:', error);
+    throw error;
   }
 };
 
 // Get game room details
-export const getGameRoom = async (token, roomCode) => {
+export const getRoom = async (roomCode, token) => {
   try {
-    if (!token) {
-      console.error('No authentication token provided');
-      return { success: false, message: 'Authentication required' };
-    }
-    
-    if (!roomCode) {
-      console.error('No room code provided');
-      return { success: false, message: 'Room code is required' };
-    }
-    
-    console.log(`Fetching game room with code: ${roomCode}`);
     console.log(`API URL: ${API_URL}/api/game-rooms/rooms/${roomCode}`);
     
     const response = await fetch(`${API_URL}/api/game-rooms/rooms/${roomCode}`, {
       method: 'GET',
       headers: {
-        'Authorization': `Bearer ${token}`,
-        'Accept': 'application/json'
-      }
+        'Authorization': `Bearer ${token}`
+      },
+      credentials: 'include'
     });
-    
+
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`Server responded with status: ${response.status}`, errorText);
-      return { 
-        success: false, 
-        message: `Server error: ${response.status} ${response.statusText}` 
-      };
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Failed to get room');
     }
-    
-    const data = await response.json();
-    return data;
+
+    return await response.json();
   } catch (error) {
-    console.error('Error fetching game room:', error);
-    return { 
-      success: false, 
-      message: `Failed to fetch game room: ${error.message}` 
-    };
+    console.error('Error getting room:', error);
+    throw error;
   }
 };
 
 // Update player ready status
-export const updateReadyStatus = async (token, roomCode, isReady) => {
+export const toggleReady = async (roomCode, token) => {
   try {
+    console.log(`Toggling ready with API URL: ${API_URL}/api/game-rooms/rooms/${roomCode}/ready`);
     const response = await fetch(`${API_URL}/api/game-rooms/rooms/${roomCode}/ready`, {
-      method: 'PATCH',
+      method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`
       },
-      body: JSON.stringify({ isReady })
+      credentials: 'include'
     });
-    
-    const data = await response.json();
-    return data;
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Failed to toggle ready status');
+    }
+
+    return await response.json();
   } catch (error) {
-    console.error('Error updating ready status:', error);
-    return { success: false, message: 'Failed to update ready status' };
+    console.error('Error toggling ready status:', error);
+    throw error;
   }
 };
 
 // Leave a game room
-export const leaveGameRoom = async (token, roomCode) => {
+export const leaveRoom = async (roomCode, token) => {
   try {
+    console.log(`Leaving room with API URL: ${API_URL}/api/game-rooms/rooms/${roomCode}/leave`);
     const response = await fetch(`${API_URL}/api/game-rooms/rooms/${roomCode}/leave`, {
-      method: 'DELETE',
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    });
-    
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    console.error('Error leaving game room:', error);
-    return { success: false, message: 'Failed to leave game room' };
-  }
-};
-
-// Update game settings (host only)
-export const updateGameSettings = async (token, roomCode, settings) => {
-  try {
-    const response = await fetch(`${API_URL}/api/game-rooms/rooms/${roomCode}/settings`, {
-      method: 'PATCH',
+      method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`
       },
-      body: JSON.stringify({ settings })
+      credentials: 'include'
     });
-    
-    const data = await response.json();
-    return data;
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Failed to leave room');
+    }
+
+    return await response.json();
   } catch (error) {
-    console.error('Error updating game settings:', error);
-    return { success: false, message: 'Failed to update game settings' };
+    console.error('Error leaving room:', error);
+    throw error;
+  }
+};
+
+// Update game settings (host only)
+export const updateSettings = async (roomCode, settings, token) => {
+  try {
+    console.log(`Updating settings with API URL: ${API_URL}/api/game-rooms/rooms/${roomCode}/settings`);
+    const response = await fetch(`${API_URL}/api/game-rooms/rooms/${roomCode}/settings`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(settings),
+      credentials: 'include'
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Failed to update settings');
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error updating settings:', error);
+    throw error;
   }
 };
 
 // Get available word packs
 export const getWordPacks = async () => {
   try {
+    console.log(`Getting word packs with API URL: ${API_URL}/api/game-rooms/wordpacks`);
     const response = await fetch(`${API_URL}/api/game-rooms/wordpacks`);
-    const data = await response.json();
-    return data;
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Failed to get word packs');
+    }
+
+    return await response.json();
   } catch (error) {
-    console.error('Error fetching word packs:', error);
-    return { success: false, message: 'Failed to fetch word packs' };
+    console.error('Error getting word packs:', error);
+    throw error;
   }
 }; 

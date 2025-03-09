@@ -14,7 +14,8 @@ export const initSocket = () => {
     reconnection: true,
     reconnectionAttempts: 5,
     reconnectionDelay: 1000,
-    timeout: 10000
+    timeout: 10000,
+    withCredentials: true
   });
 
   // Make socket available globally
