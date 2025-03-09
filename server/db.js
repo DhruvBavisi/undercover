@@ -6,15 +6,18 @@ dotenv.config();
 const connectDB = async () => {
   try {
     // Get MongoDB connection string from environment variables
-    const mongoURI = process.env.MONGO_ATLAS_URI;
+    const mongoURI = process.env.MONGODB_URI;
     
     if (!mongoURI) {
-      console.error('MongoDB URI not found in environment variables. Please set MONGO_ATLAS_URI.');
+      console.error('MongoDB URI not found in environment variables. Please set MONGODB_URI.');
       process.exit(1);
     }
     
-    // Connect to MongoDB (works for both local and Atlas)
-    const conn = await mongoose.connect(mongoURI);
+    // Connect to MongoDB with updated options
+    const conn = await mongoose.connect(mongoURI, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+    });
     
     // Determine if using local or Atlas
     const isLocalConnection = mongoURI.includes('localhost') || mongoURI.includes('127.0.0.1');

@@ -25,7 +25,7 @@ const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
     origin: process.env.NODE_ENV === 'production' 
-      ? [process.env.VERCEL_URL, process.env.CLIENT_URL] 
+      ? ['https://undercover-lb9hnwrmg-dhruvs-projects-5a6d3e4b.vercel.app', 'https://un-cv.vercel.app'] 
       : [process.env.CLIENT_URL, 'http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175'],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     credentials: true
@@ -38,7 +38,7 @@ const io = new Server(server, {
 // Middleware
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
-    ? [process.env.VERCEL_URL, process.env.CLIENT_URL]
+    ? ['https://undercover-lb9hnwrmg-dhruvs-projects-5a6d3e4b.vercel.app', 'https://un-cv.vercel.app']
     : [process.env.CLIENT_URL, 'http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175'],
   credentials: true
 }));
