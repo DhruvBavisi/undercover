@@ -6,13 +6,14 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../components/ui/card';
 import { Alert, AlertDescription } from '../components/ui/alert';
-import { ArrowLeft, AlertCircle, Loader2 } from 'lucide-react';
+import { ArrowLeft, AlertCircle, Loader2, Info } from 'lucide-react';
 
 export default function LoginPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [formError, setFormError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isServerStarting, setIsServerStarting] = useState(false);
   
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -28,19 +29,37 @@ export default function LoginPage() {
     
     setIsSubmitting(true);
     setFormError('');
+    setIsServerStarting(false);
     
     try {
-      const result = await login({ username, password });
+      // First attempt
+      let result = await login({ username, password });
+      
+      // If we get a network error, the server might be spinning up
+      if (!result.success && (result.message.includes('Failed to fetch') || 
+          result.message.includes('server might be starting up'))) {
+        setIsServerStarting(true);
+        setFormError('Server is starting up. This may take up to a minute...');
+        
+        // Wait a bit and try again
+        await new Promise(resolve => setTimeout(resolve, 10000)); // 10 seconds
+        
+        if (isServerStarting) {
+          result = await login({ username, password });
+        }
+      }
       
       if (result.success) {
         // Redirect to home page on successful login
         navigate('/');
       } else {
         setFormError(result.message);
+        setIsServerStarting(false);
       }
     } catch (error) {
       setFormError('An unexpected error occurred. Please try again.');
       console.error('Login error:', error);
+      setIsServerStarting(false);
     } finally {
       setIsSubmitting(false);
     }
@@ -63,8 +82,17 @@ export default function LoginPage() {
           </CardHeader>
           
           <CardContent>
+            {isServerStarting && (
+              <Alert className="mb-4 bg-blue-900/30 border-blue-900 text-blue-300">
+                <Info className="h-4 w-4" />
+                <AlertDescription>
+                  The server is starting up. This may take up to a minute. Please wait...
+                </AlertDescription>
+              </Alert>
+            )}
+            
             <form onSubmit={handleSubmit} className="space-y-4">
-              {formError && (
+              {formError && !isServerStarting && (
                 <Alert variant="destructive" className="bg-red-900/30 border-red-900 text-red-300">
                   <AlertCircle className="h-4 w-4" />
                   <AlertDescription>{formError}</AlertDescription>
@@ -110,7 +138,7 @@ export default function LoginPage() {
                 {isSubmitting ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Logging in...
+                    {isServerStarting ? 'Starting server...' : 'Logging in...'}
                   </>
                 ) : (
                   'Login'

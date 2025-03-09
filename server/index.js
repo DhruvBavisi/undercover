@@ -11,6 +11,7 @@ import Game from './models/Game.js';
 import GameRoom from './models/GameRoom.js';
 import { getRandomWordPair } from './utils/wordPacks.js';
 import gameRoomRoutes from './routes/gameRoomRoutes.js';
+import axios from 'axios';
 
 // Load environment variables
 dotenv.config();
@@ -384,3 +385,26 @@ if (process.env.VERCEL) {
 
 // Export the Express app for Vercel serverless deployment
 export { app as default };
+
+// Keep-alive mechanism to prevent Render from spinning down
+const RENDER_URL = process.env.RENDER_URL || 'https://undercover-1n9q.onrender.com';
+const PING_INTERVAL = 14 * 60 * 1000; // 14 minutes in milliseconds
+
+function keepAlive() {
+  console.log(`[${new Date().toISOString()}] Pinging server to keep alive...`);
+  axios.get(`${RENDER_URL}/api/health`)
+    .then(response => {
+      console.log(`[${new Date().toISOString()}] Keep-alive ping successful: ${response.status}`);
+    })
+    .catch(error => {
+      console.error(`[${new Date().toISOString()}] Keep-alive ping failed:`, error.message);
+    });
+}
+
+// Start the keep-alive mechanism
+if (process.env.NODE_ENV === 'production') {
+  console.log('Starting keep-alive mechanism for production environment');
+  setInterval(keepAlive, PING_INTERVAL);
+  // Initial ping
+  keepAlive();
+}
