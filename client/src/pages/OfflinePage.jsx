@@ -34,6 +34,7 @@ export default function OfflinePage() {
   const [wordCategory, setWordCategory] = useState("general");
   const [playerNames, setPlayerNames] = useState(initialPlayerNames.length ? initialPlayerNames : Array(3).fill(""));
   const [nameErrors, setNameErrors] = useState(Array(3).fill(""));
+  const [rounds, setRounds] = useState(playerCount - 2);
 
   // Refs for player name inputs
   const inputRefs = useRef([]);
@@ -80,6 +81,10 @@ export default function OfflinePage() {
           
           if (settings.wordCategory) {
             setWordCategory(settings.wordCategory);
+          }
+          
+          if (settings.rounds) {
+            setRounds(settings.rounds);
           }
         } catch (error) {
           console.error("Error loading existing settings:", error);
@@ -188,6 +193,7 @@ export default function OfflinePage() {
 
     // Apply recommended roles based on new player count
     applyRecommendedRoles(count);
+    setRounds(count - 2);
   };
 
   const handleAddPlayer = () => {
@@ -229,6 +235,47 @@ export default function OfflinePage() {
     
     setPlayerNames(newPlayerNames);
     setNameErrors(newNameErrors);
+  };
+
+  const handleRemovePlayer = (index) => {
+    if (playerCount > 3) {
+      const updatedNames = [...playerNames];
+      updatedNames.splice(index, 1);
+      setPlayerNames(updatedNames);
+      setPlayerCount(playerCount - 1);
+
+      const updatedErrors = [...nameErrors];
+      updatedErrors.splice(index, 1);
+      setNameErrors(updatedErrors);
+    }
+  };
+
+  const handleUndercoverCountChange = (count) => {
+    if (playerCount === 3) {
+      if (count < undercoverCount) {
+        setMrWhiteCount(1);
+      } else if (count > undercoverCount) {
+        setMrWhiteCount(0);
+      }
+    }
+    setUndercoverCount(count);
+  };
+
+  const handleMrWhiteCountChange = (count) => {
+    if (playerCount === 3) {
+      if (count < mrWhiteCount) {
+        setUndercoverCount(1);
+      } else if (count > mrWhiteCount) {
+        setUndercoverCount(0);
+      }
+    }
+    setMrWhiteCount(count);
+  };
+
+  const handleRoundsChange = (newRounds) => {
+    if (newRounds >= 1 && newRounds <= playerCount - 2) {
+      setRounds(newRounds);
+    }
   };
 
   // Handle Enter key press in player name inputs
@@ -277,6 +324,7 @@ export default function OfflinePage() {
         undercoverCount,
         mrWhiteCount,
         wordCategory,
+        rounds,
       })
     );
 
@@ -343,7 +391,7 @@ export default function OfflinePage() {
                         <Button
                           variant="outline"
                           size="icon"
-                          onClick={() => setUndercoverCount(Math.max(0, undercoverCount - 1))}
+                          onClick={() => handleUndercoverCountChange(Math.max(0, undercoverCount - 1))}
                           className="h-7 w-7 !rounded-full bg-black text-white hover:bg-black/80"
                         >
                           <Minus className="h-3 w-3" />
@@ -363,7 +411,7 @@ export default function OfflinePage() {
                           onClick={() => {
                             const newCount = undercoverCount + 1;
                             if (newCount <= maxUndercover) {
-                              setUndercoverCount(newCount);
+                              handleUndercoverCountChange(newCount);
                             }
                           }}
                           className="h-7 w-7 !rounded-full bg-black text-white hover:bg-black/80"
@@ -386,7 +434,7 @@ export default function OfflinePage() {
                               setIncludeWhite(false);
                               setMrWhiteCount(0);
                             } else {
-                              setMrWhiteCount(mrWhiteCount - 1);
+                              handleMrWhiteCountChange(mrWhiteCount - 1);
                             }
                           }}
                           className="h-6 w-6 !rounded-full bg-white text-black hover:bg-white/80"
@@ -412,7 +460,7 @@ export default function OfflinePage() {
                             } else {
                               const newCount = mrWhiteCount + 1;
                               if (newCount <= maxMrWhite) {
-                                setMrWhiteCount(newCount);
+                                handleMrWhiteCountChange(newCount);
                               }
                             }
                           }}
@@ -426,6 +474,35 @@ export default function OfflinePage() {
                     </div>
                   </div>
 
+                </div>
+
+                <div className="space-y-3">
+                  <Label>Rounds</Label>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="secondary"
+                      size="icon"
+                      onClick={() => handleRoundsChange(rounds - 1)}
+                      disabled={rounds <= 1}
+                      className="bg-purple-700 border-gray-600 hover:bg-purple-600"
+                    >
+                      <Minus className="h-4 w-4" />
+                    </Button>
+                    <Input
+                      value={rounds}
+                      readOnly
+                      className="w-16 text-center bg-gray-700 border-gray-600"
+                    />
+                    <Button
+                      variant="secondary"
+                      size="icon"
+                      onClick={() => handleRoundsChange(rounds + 1)}
+                      disabled={rounds >= playerCount - 2}
+                      className="bg-purple-700 border-gray-600 hover:bg-purple-600"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
 
                 <div className="space-y-2">
@@ -448,20 +525,26 @@ export default function OfflinePage() {
                   <Label>Player Names</Label>
                   <div className="space-y-3 max-h-60 overflow-y-auto pr-2">
                     {Array.from({ length: playerCount }).map((_, index) => (
-                      <div key={index}>
-                        <div className="flex items-center gap-2">
-                          <div className="bg-gray-700/50 h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0">
-                            {index + 1}
-                          </div>
-                          <Input
-                            placeholder={`Player ${index + 1}`}
-                            value={playerNames[index] || ""}
-                            onChange={(e) => handlePlayerNameChange(index, e.target.value)}
-                            onKeyDown={(e) => handleKeyDown(e, index)}
-                            ref={(el) => (inputRefs.current[index] = el)}
-                            className="bg-gray-700 border-gray-600"
-                          />
+                      <div key={index} className="flex items-center gap-2">
+                        <div className="bg-gray-700/50 h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0">
+                          {index + 1}
                         </div>
+                        <Input
+                          ref={(el) => (inputRefs.current[index] = el)}
+                          placeholder={`Player ${index + 1}`}
+                          value={playerNames[index]}
+                          onChange={(e) => handlePlayerNameChange(index, e.target.value)}
+                          onKeyDown={(e) => handleKeyDown(e, index)}
+                          className="bg-gray-700 border-gray-600"
+                        />
+                        <Button
+                          variant="secondary"
+                          size="icon"
+                          className="bg-purple-700 border-gray-600 hover:bg-purple-600"
+                          onClick={() => handleRemovePlayer(index)}
+                        >
+                          <Minus className="h-4 w-4" />
+                        </Button>
                         {nameErrors[index] && (
                           <p className="text-red-500 text-sm mt-1">{nameErrors[index]}</p>
                         )}

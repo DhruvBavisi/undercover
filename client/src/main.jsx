@@ -82,6 +82,7 @@ const router = createBrowserRouter([
       },
       { path: 'how-to-play', element: <HowToPlayPage /> },
       { path: 'offline', element: <OfflinePage /> },
+      { path: 'offline/setup', element: <OfflinePage /> },
       { path: 'offline/game', element: <OfflineGamePage /> },
       { path: 'groups', element: <GroupsPage /> },
       { path: 'group/:groupId', element: <GroupDetailsPage /> },
