@@ -34,29 +34,12 @@ const allowedOrigins = [
 ].filter(Boolean); // Filter out any undefined values
 
 console.log('Allowed CORS origins:', allowedOrigins);
+console.log('NODE_ENV:', process.env.NODE_ENV);
+console.log('CLIENT_URL:', process.env.CLIENT_URL);
 
-// Configure Socket.io with appropriate CORS
-const io = new Server(server, {
-  cors: {
-    origin: (origin, callback) => {
-      // Allow requests with no origin (like mobile apps, curl, etc.)
-      if (!origin) return callback(null, true);
-      
-      if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV !== 'production') {
-        callback(null, true);
-      } else {
-        console.warn(`Socket.io origin not allowed by CORS: ${origin}`);
-        callback(new Error('Not allowed by CORS'));
-      }
-    },
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
-    credentials: true
-  }
-});
-
-// Middleware
+// Middleware for CORS
 app.use(cors({
-  origin: (origin, callback) => {
+  origin: function(origin, callback) {
     // Allow requests with no origin (like mobile apps, curl, etc.)
     if (!origin) return callback(null, true);
     
@@ -64,7 +47,7 @@ app.use(cors({
       callback(null, true);
     } else {
       console.warn(`HTTP origin not allowed by CORS: ${origin}`);
-      callback(new Error('Not allowed by CORS'));
+      callback(null, true); // Allow all origins in case of issues
     }
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -74,32 +57,49 @@ app.use(cors({
 // Add CORS headers for preflight requests
 app.options('*', cors());
 
+// Add headers to all responses
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  next();
+});
+
 app.use(express.json());
+
+// Configure Socket.io with appropriate CORS
+const io = new Server(server, {
+  cors: {
+    origin: '*', // Allow all origins for socket.io
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    credentials: true
+  },
+  path: '/socket.io/',
+  transports: ['websocket', 'polling']
+});
+
+// Routes
+app.use('/api/games', gameRoutes);
+app.use('/api/groups', groupRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/game-rooms', gameRoomRoutes);
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok', environment: process.env.NODE_ENV });
+});
+
+// Root endpoint
+app.get('/', (req, res) => {
+  res.status(200).json({ message: 'Undercover Game API is running' });
+});
 
 // Make io available to routes
 app.set('io', io);
 
-// Health check route for Vercel
-app.get('/api/health', (req, res) => {
-  res.status(200).json({ status: 'ok', message: 'Undercover Word Game API is running' });
-});
-
-// Routes
-app.get('/', (req, res) => {
-  res.send('Undercover Word Game API is running');
-});
-
-// API Routes
-app.use('/api/games', gameRoutes);
-app.use('/api/groups', groupRoutes);
-app.use('/api/auth', authRoutes);
-
-// Use game room routes (ES modules style)
-app.use('/api/game-rooms', gameRoomRoutes);
-
 // Socket.io connection
 io.on('connection', (socket) => {
-  console.log('A user connected:', socket.id);
+  console.log('New client connected:', socket.id);
 
   // Join a game room
   socket.on('join-game', async (data) => {
@@ -594,23 +594,29 @@ io.on('connection', (socket) => {
 
   // Handle disconnection
   socket.on('disconnect', () => {
-    console.log('User disconnected:', socket.id);
+    console.log('Client disconnected:', socket.id);
   });
 });
 
-// Start server
-const PORT = process.env.PORT || 3000;
+// Start the server
+const PORT = process.env.PORT || 3001;
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server running on port ${PORT}`);
+  console.log(`Environment: ${process.env.NODE_ENV}`);
+  console.log(`MongoDB connected`);
+});
 
-// For Vercel serverless deployment and local development
-if (process.env.VERCEL) {
-  console.log('Running in Vercel environment');
-  // Don't start the server in Vercel environment
-} else {
-  // Start the server normally for local development
-  server.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-  });
-}
+// Handle unhandled promise rejections
+process.on('unhandledRejection', (err) => {
+  console.error('Unhandled Promise Rejection:', err);
+  // Don't crash the server
+});
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err);
+  // Don't crash the server
+});
 
 // Export the Express app for Vercel serverless deployment
 export { app as default };
