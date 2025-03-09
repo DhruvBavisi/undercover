@@ -9,4 +9,9 @@ export const DEFAULT_ROUND_TIME = 60; // seconds
 
 // Environment configuration
 export const IS_PRODUCTION = import.meta.env.PROD;
-export const IS_DEVELOPMENT = import.meta.env.DEV; 
+export const IS_DEVELOPMENT = import.meta.env.DEV;
+
+// Log the API URL being used (for debugging)
+console.log('Using API URL:', API_URL);
+console.log('Using Socket URL:', SOCKET_URL);
+console.log('Environment:', IS_PRODUCTION ? 'Production' : 'Development'); 

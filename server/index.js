@@ -21,35 +21,59 @@ connectDB();
 const app = express();
 const server = http.createServer(app);
 
-// Define development origins
-const developmentOrigins = [
+// Define allowed origins
+const allowedOrigins = [
+  // Production origins
   process.env.CLIENT_URL,
+  'https://undercover-8jswt6ept-dhruvs-projects-5a6d3e4b.vercel.app',
+  'https://undercover-game.vercel.app',
+  // Development origins
   'http://localhost:5173',
-  'http://localhost:5174', 
+  'http://localhost:5174',
   'http://localhost:5175'
 ].filter(Boolean); // Filter out any undefined values
+
+console.log('Allowed CORS origins:', allowedOrigins);
 
 // Configure Socket.io with appropriate CORS
 const io = new Server(server, {
   cors: {
-    origin: process.env.NODE_ENV === 'production'
-      ? process.env.CLIENT_URL
-      : developmentOrigins,
-    methods: ['GET', 'POST'],
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps, curl, etc.)
+      if (!origin) return callback(null, true);
+      
+      if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV !== 'production') {
+        callback(null, true);
+      } else {
+        console.warn(`Socket.io origin not allowed by CORS: ${origin}`);
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
     credentials: true
-  },
-  path: '/socket.io/',
-  addTrailingSlash: false,
-  transports: ['websocket', 'polling']
+  }
 });
 
 // Middleware
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production'
-    ? process.env.CLIENT_URL
-    : developmentOrigins,
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps, curl, etc.)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV !== 'production') {
+      callback(null, true);
+    } else {
+      console.warn(`HTTP origin not allowed by CORS: ${origin}`);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   credentials: true
 }));
+
+// Add CORS headers for preflight requests
+app.options('*', cors());
+
 app.use(express.json());
 
 // Make io available to routes
