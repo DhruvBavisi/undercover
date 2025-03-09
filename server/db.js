@@ -13,11 +13,8 @@ const connectDB = async () => {
       process.exit(1);
     }
     
-    // Connect to MongoDB with updated options
-    const conn = await mongoose.connect(mongoURI, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    });
+    // Connect to MongoDB with updated options (removed deprecated options)
+    const conn = await mongoose.connect(mongoURI);
     
     // Determine if using local or Atlas
     const isLocalConnection = mongoURI.includes('localhost') || mongoURI.includes('127.0.0.1');
