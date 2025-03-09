@@ -98,9 +98,10 @@ function getMinCivilians(playerCount) {
 /**
  * Randomize the speaking order
  * @param {Array} players - Array of player objects
+ * @param {number} round - Current round number
  * @returns {Array} - Randomized array of player IDs for speaking order
  */
-export function randomizeSpeakingOrder(players) {
+export function randomizeSpeakingOrder(players, round = 1) {
   if (!players || players.length === 0) {
     return [];
   }
@@ -108,34 +109,58 @@ export function randomizeSpeakingOrder(players) {
   // Create a copy of the array to avoid mutation
   const randomized = [...players];
 
-  // Fisher-Yates shuffle algorithm
+  // First shuffle: Fisher-Yates algorithm
   for (let i = randomized.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [randomized[i], randomized[j]] = [randomized[j], randomized[i]];
   }
 
-  // Ensure Mr. White isn't first
-  if (randomized[0]?.role === 'Mr. White') {
-    // Collect all valid swap candidates (non-Mr. White players)
-    const validCandidates = randomized
-      .map((player, index) => ({ player, index }))
-      .filter(({ player, index }) => 
-        player.role !== 'Mr. White' && 
-        index !== 0 // Ensure we don't swap with ourselves
-      );
+  // Second shuffle: Random offset rotation
+  const offset = Math.floor(Math.random() * randomized.length);
+  const rotated = [...randomized.slice(offset), ...randomized.slice(0, offset)];
 
-    // Only swap if valid candidates exist
-    if (validCandidates.length > 0) {
-      // Randomly select a candidate from valid options
-      const swapTarget = validCandidates[Math.floor(Math.random() * validCandidates.length)];
-      
-      // Perform the swap
-      [randomized[0], randomized[swapTarget.index]] = 
-        [randomized[swapTarget.index], randomized[0]];
+  // Third shuffle: Pair-wise swaps with random probability
+  for (let i = 0; i < rotated.length - 1; i += 2) {
+    if (Math.random() < 0.5) {
+      [rotated[i], rotated[i + 1]] = [rotated[i + 1], rotated[i]];
     }
   }
 
-  return randomized.map(player => player.id);
+  // Only prevent Mr. White from being first in the first round
+  if (round === 1 && rotated[0]?.role === 'Mr. White') {
+    // Find all non-Mr. White players
+    const validSwapIndices = rotated
+      .map((player, index) => ({ player, index }))
+      .filter(({ player, index }) => 
+        player.role !== 'Mr. White' && 
+        index !== 0
+      );
+
+    if (validSwapIndices.length > 0) {
+      // Randomly select a non-Mr. White player to swap with
+      const swapIndex = validSwapIndices[Math.floor(Math.random() * validSwapIndices.length)].index;
+      [rotated[0], rotated[swapIndex]] = [rotated[swapIndex], rotated[0]];
+    }
+  }
+
+  // Final validation: ensure we don't have any obvious patterns
+  const roles = rotated.map(p => p.role);
+  const hasPattern = roles.some((role, i) => 
+    i > 0 && i < roles.length - 1 && 
+    roles[i-1] === role && roles[i+1] === role
+  );
+
+  if (hasPattern) {
+    // If we detect a pattern, do one more shuffle
+    for (let i = rotated.length - 1; i > 0; i--) {
+      if (Math.random() < 0.3) { // 30% chance to swap
+        const j = Math.floor(Math.random() * i);
+        [rotated[i], rotated[j]] = [rotated[j], rotated[i]];
+      }
+    }
+  }
+
+  return rotated.map(player => player.id);
 }
 
 /**
@@ -145,9 +170,10 @@ export function randomizeSpeakingOrder(players) {
  * @param {boolean} includeWhite - Whether to include Mr. White role
  * @param {string[]} wordPair - The word pair for the game [civilianWord, undercoverWord]
  * @param {number} undercoverCount - Number of undercover agents to include
+ * @param {number} requestedMrWhiteCount - Number of Mr. White players requested
  * @returns {Array} - Array of players with assigned roles and words
  */
-export function assignRoles(playerNames, playerCount, includeWhite = true, wordPair = ['', ''], undercoverCount = 1) {
+export function assignRoles(playerNames, playerCount, includeWhite = true, wordPair = ['', ''], undercoverCount = 1, requestedMrWhiteCount = 1) {
   if (!playerNames || playerCount < 3) {
     return [];
   }
@@ -169,7 +195,23 @@ export function assignRoles(playerNames, playerCount, includeWhite = true, wordP
 
   // Validate role counts
   const actualUndercoverCount = Math.min(maxUndercover, undercoverCount);
-  const mrWhiteCount = includeWhite ? Math.min(maxMrWhite, playerCount - actualUndercoverCount - minCivilians) : 0;
+  const mrWhiteCount = includeWhite ? Math.min(maxMrWhite, requestedMrWhiteCount) : 0;
+
+  // Ensure we don't exceed the maximum special roles
+  const totalSpecialRoles = actualUndercoverCount + mrWhiteCount;
+  const maxSpecialRoles = playerCount - minCivilians;
+  
+  let finalMrWhiteCount = mrWhiteCount;
+  let finalUndercoverCount = actualUndercoverCount;
+  
+  if (totalSpecialRoles > maxSpecialRoles) {
+    // Reduce Mr. White count first if needed
+    finalMrWhiteCount = Math.max(0, maxSpecialRoles - actualUndercoverCount);
+    // If still too many special roles, reduce undercover count
+    if (finalMrWhiteCount === 0 && finalUndercoverCount > maxSpecialRoles) {
+      finalUndercoverCount = maxSpecialRoles;
+    }
+  }
 
   // Create array of all player indices and shuffle for role assignment
   const roleAssignmentOrder = players.map(p => p.id);
@@ -182,7 +224,7 @@ export function assignRoles(playerNames, playerCount, includeWhite = true, wordP
   let assignmentPointer = 0;
   
   // Assign Undercover
-  for (let i = 0; i < actualUndercoverCount; i++) {
+  for (let i = 0; i < finalUndercoverCount; i++) {
     const playerId = roleAssignmentOrder[assignmentPointer++];
     players[playerId] = {
       ...players[playerId],
@@ -193,7 +235,7 @@ export function assignRoles(playerNames, playerCount, includeWhite = true, wordP
   }
 
   // Assign Mr. White
-  for (let i = 0; i < mrWhiteCount; i++) {
+  for (let i = 0; i < finalMrWhiteCount; i++) {
     const playerId = roleAssignmentOrder[assignmentPointer++];
     players[playerId] = {
       ...players[playerId],
@@ -215,7 +257,7 @@ export function assignRoles(playerNames, playerCount, includeWhite = true, wordP
   }
 
   // Generate speaking order after roles are assigned
-  const speakingOrder = randomizeSpeakingOrder(players);
+  const speakingOrder = randomizeSpeakingOrder(players, 1);
 
   return {
     players,

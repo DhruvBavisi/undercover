@@ -4,12 +4,12 @@ import { useAuth } from './AuthContext';
 import { useSocket } from './SocketContext.jsx';
 import { useToast } from '../hooks/use-toast';
 import { 
-  createGameRoom, 
-  joinGameRoom, 
-  getGameRoom, 
-  updateReadyStatus, 
-  leaveGameRoom, 
-  updateGameSettings
+  createRoom, 
+  joinRoom, 
+  getRoom, 
+  toggleReady, 
+  leaveRoom, 
+  updateSettings
 } from '../services/gameRoom';
 import { API_URL } from '../config';
 
@@ -202,7 +202,7 @@ export const GameRoomProvider = ({ children }) => {
     
     try {
       console.log('Creating game room with settings:', settings);
-      const response = await createGameRoom(token, settings);
+      const response = await createRoom(token, settings);
       
       if (response.success) {
         console.log('Game room created successfully:', response.room);
@@ -240,7 +240,7 @@ export const GameRoomProvider = ({ children }) => {
     
     try {
       console.log('Joining game room:', roomCode);
-      const response = await joinGameRoom(token, roomCode);
+      const response = await joinRoom(token, roomCode);
       
       if (response.success) {
         console.log('Joined game room successfully:', response.room);
@@ -277,7 +277,7 @@ export const GameRoomProvider = ({ children }) => {
     
     try {
       console.log(`Fetching game room with code: ${roomCode}`);
-      const response = await getGameRoom(token, roomCode);
+      const response = await getRoom(token, roomCode);
       
       if (response.success) {
         console.log('Game room fetched successfully:', response.room);
@@ -300,7 +300,7 @@ export const GameRoomProvider = ({ children }) => {
     
     try {
       console.log(`Setting player ready status to: ${isReady}`);
-      const response = await updateReadyStatus(token, room.roomCode, isReady);
+      const response = await toggleReady(token, room.roomCode, isReady);
       
       if (response.success) {
         console.log('Ready status updated successfully');
@@ -320,7 +320,7 @@ export const GameRoomProvider = ({ children }) => {
     
     try {
       console.log('Leaving game room:', room.roomCode);
-      const response = await leaveGameRoom(token, room.roomCode);
+      const response = await leaveRoom(token, room.roomCode);
       
       if (response.success) {
         console.log('Left game room successfully');
@@ -344,7 +344,7 @@ export const GameRoomProvider = ({ children }) => {
     
     try {
       console.log('Updating game room settings:', settings);
-      const response = await updateGameSettings(token, room.roomCode, settings);
+      const response = await updateSettings(token, room.roomCode, settings);
       
       if (response.success) {
         console.log('Settings updated successfully');
