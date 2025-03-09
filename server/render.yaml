@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: undercover-game-api
+    env: node
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3001
+      - key: MONGO_ATLAS_URI
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: CLIENT_URL
+        sync: false
+      - key: RENDER_URL
+        value: https://undercover-1n9q.onrender.com
+      - key: BASE_API_URL
+        value: https://undercover-1n9q.onrender.com
+      - key: SOCKET_URL
+        value: https://undercover-1n9q.onrender.com 

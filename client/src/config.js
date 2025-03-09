@@ -1,6 +1,6 @@
 // API configuration
-export const API_URL = import.meta.env.VITE_API_URL || 'https://undercover-1n9q.onrender.com';
-export const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'https://undercover-1n9q.onrender.com';
+export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+export const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001';
 
 // Game configuration
 export const MAX_PLAYERS = 12;

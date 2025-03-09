@@ -11,7 +11,6 @@ import Game from './models/Game.js';
 import GameRoom from './models/GameRoom.js';
 import { getRandomWordPair } from './utils/wordPacks.js';
 import gameRoomRoutes from './routes/gameRoomRoutes.js';
-import axios from 'axios';
 
 // Load environment variables
 dotenv.config();
@@ -22,11 +21,11 @@ connectDB();
 const app = express();
 const server = http.createServer(app);
 
-// Configure Socket.io with appropriate CORS for Vercel
+// Configure Socket.io with appropriate CORS for Render
 const io = new Server(server, {
   cors: {
     origin: process.env.NODE_ENV === 'production' 
-      ? ['https://undercover-lb9hnwrmg-dhruvs-projects-5a6d3e4b.vercel.app', 'https://un-cv.vercel.app'] 
+      ? [process.env.RENDER_URL, process.env.CLIENT_URL] 
       : [process.env.CLIENT_URL, 'http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175'],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     credentials: true
@@ -39,7 +38,7 @@ const io = new Server(server, {
 // Middleware
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
-    ? ['https://undercover-lb9hnwrmg-dhruvs-projects-5a6d3e4b.vercel.app', 'https://un-cv.vercel.app']
+    ? [process.env.RENDER_URL, process.env.CLIENT_URL]
     : [process.env.CLIENT_URL, 'http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175'],
   credentials: true
 }));
@@ -65,7 +64,8 @@ app.use('/api/game-rooms', gameRoomRoutes);
 
 // Socket.io connection
 io.on('connection', (socket) => {
-  console.log('A user connected:', socket.id);
+  const environment = process.env.NODE_ENV === 'production' ? 'production' : 'development';
+  console.log(`[${environment}] Socket connected: ${socket.id}`);
 
   // Join a game room
   socket.on('join-game', async (data) => {
@@ -365,46 +365,43 @@ io.on('connection', (socket) => {
 
   // Handle disconnection
   socket.on('disconnect', () => {
-    console.log('User disconnected:', socket.id);
+    console.log(`Socket disconnected: ${socket.id}`);
   });
 });
 
 // Start server
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3001;
 
-// For Vercel serverless deployment and local development
-if (process.env.VERCEL) {
-  console.log('Running in Vercel environment');
-  // Don't start the server in Vercel environment
-} else {
-  // Start the server normally for local development
+// For Render deployment
+if (process.env.NODE_ENV === 'production') {
   server.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+    console.log(`
+╔════════════════════════════════════════════════════════╗
+║                                                        ║
+║   Undercover Game Server Running in Production Mode    ║
+║                                                        ║
+║   Server URL: ${process.env.RENDER_URL}                
+║   Port: ${PORT}                                        
+║   Environment: ${process.env.NODE_ENV}                 
+║                                                        ║
+╚════════════════════════════════════════════════════════╝
+`);
+  });
+} else {
+  // Start the server for local development
+  server.listen(PORT, () => {
+    console.log(`
+╔════════════════════════════════════════════════════════╗
+║                                                        ║
+║   Undercover Game Server Running in Development Mode   ║
+║                                                        ║
+║   Server URL: http://localhost:${PORT}                 
+║   Environment: ${process.env.NODE_ENV || 'development'}
+║                                                        ║
+╚════════════════════════════════════════════════════════╝
+`);
   });
 }
 
-// Export the Express app for Vercel serverless deployment
+// Export the Express app for serverless deployment
 export { app as default };
-
-// Keep-alive mechanism to prevent Render from spinning down
-const RENDER_URL = process.env.RENDER_URL || 'https://undercover-1n9q.onrender.com';
-const PING_INTERVAL = 14 * 60 * 1000; // 14 minutes in milliseconds
-
-function keepAlive() {
-  console.log(`[${new Date().toISOString()}] Pinging server to keep alive...`);
-  axios.get(`${RENDER_URL}/api/health`)
-    .then(response => {
-      console.log(`[${new Date().toISOString()}] Keep-alive ping successful: ${response.status}`);
-    })
-    .catch(error => {
-      console.error(`[${new Date().toISOString()}] Keep-alive ping failed:`, error.message);
-    });
-}
-
-// Start the keep-alive mechanism
-if (process.env.NODE_ENV === 'production') {
-  console.log('Starting keep-alive mechanism for production environment');
-  setInterval(keepAlive, PING_INTERVAL);
-  // Initial ping
-  keepAlive();
-}
