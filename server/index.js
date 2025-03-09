@@ -21,21 +21,20 @@ connectDB();
 const app = express();
 const server = http.createServer(app);
 
-// Update CORS configuration
-const corsOptions = {
-  origin: process.env.NODE_ENV === 'production'
-    ? process.env.CLIENT_URL
-    : [process.env.CLIENT_URL, 'http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175'],
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  credentials: true
-};
+// Define development origins
+const developmentOrigins = [
+  process.env.CLIENT_URL,
+  'http://localhost:5173',
+  'http://localhost:5174', 
+  'http://localhost:5175'
+].filter(Boolean); // Filter out any undefined values
 
-// Configure Socket.io with appropriate CORS for Vercel
+// Configure Socket.io with appropriate CORS
 const io = new Server(server, {
   cors: {
     origin: process.env.NODE_ENV === 'production'
       ? process.env.CLIENT_URL
-      : [process.env.CLIENT_URL, 'http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175'],
+      : developmentOrigins,
     methods: ['GET', 'POST'],
     credentials: true
   },
@@ -45,7 +44,12 @@ const io = new Server(server, {
 });
 
 // Middleware
-app.use(cors(corsOptions));
+app.use(cors({
+  origin: process.env.NODE_ENV === 'production'
+    ? process.env.CLIENT_URL
+    : developmentOrigins,
+  credentials: true
+}));
 app.use(express.json());
 
 // Make io available to routes

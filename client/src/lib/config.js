@@ -1,6 +1,6 @@
 const config = {
-  apiUrl: 'http://localhost:3001/api',
-  socketUrl: 'http://localhost:3001',
+  apiUrl: import.meta.env.VITE_API_URL || 'http://localhost:3001/api',
+  socketUrl: import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001',
   isDevelopment: import.meta.env.DEV || false,
 };
 
