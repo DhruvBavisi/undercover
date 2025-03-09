@@ -11,31 +11,80 @@ import HowToPlayPage from './pages/HowToPlayPage.jsx';
 import OfflinePage from './pages/OfflinePage.jsx';
 import OfflineGamePage from './pages/OfflineGamePage.jsx';
 import GroupsPage from './pages/GroupsPage.jsx';
-import GroupDetailsPage from './pages/GroupDetailsPage.jsx'; // Added import statement
+import GroupDetailsPage from './pages/GroupDetailsPage.jsx';
+import LoginPage from './pages/LoginPage.jsx';
+import RegisterPage from './pages/RegisterPage.jsx';
+import ProfilePage from './pages/ProfilePage.jsx';
 import { ThemeProvider } from './components/theme-provider.jsx';
+import { AuthProvider } from './context/AuthContext.jsx';
+import { SocketProvider } from './context/SocketContext.jsx';
+import { GameRoomProvider } from './context/GameRoomContext.jsx';
 
+// Create a wrapper component that includes all providers except RouterProvider
+const AppProviders = ({ children }) => {
+  return (
+    <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
+      <AuthProvider>
+        <SocketProvider>
+          {children}
+        </SocketProvider>
+      </AuthProvider>
+    </ThemeProvider>
+  );
+};
+
+// Create router with the wrapper
 const router = createBrowserRouter([
   {
     path: '/',
-    element: <App />,
+    element: (
+      <AppProviders>
+        <App />
+      </AppProviders>
+    ),
     children: [
-      { index: true, element: <HomePage /> },
-      { path: 'create', element: <CreateGamePage /> },
-      { path: 'join', element: <JoinGamePage /> },
-      { path: 'game/:gameCode', element: <GamePage /> },
+      { 
+        index: true, 
+        element: <HomePage /> 
+      },
+      { 
+        path: 'create', 
+        element: (
+          <GameRoomProvider>
+            <CreateGamePage />
+          </GameRoomProvider>
+        )
+      },
+      { 
+        path: 'join', 
+        element: (
+          <GameRoomProvider>
+            <JoinGamePage />
+          </GameRoomProvider>
+        )
+      },
+      { 
+        path: 'game/:gameCode', 
+        element: (
+          <GameRoomProvider>
+            <GamePage />
+          </GameRoomProvider>
+        )
+      },
       { path: 'how-to-play', element: <HowToPlayPage /> },
       { path: 'offline', element: <OfflinePage /> },
       { path: 'offline/game', element: <OfflineGamePage /> },
       { path: 'groups', element: <GroupsPage /> },
       { path: 'group/:groupId', element: <GroupDetailsPage /> },
+      { path: 'login', element: <LoginPage /> },
+      { path: 'register', element: <RegisterPage /> },
+      { path: 'profile', element: <ProfilePage /> },
     ],
   },
 ]);
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
-      <RouterProvider router={router} />
-    </ThemeProvider>
+    <RouterProvider router={router} />
   </React.StrictMode>
 );

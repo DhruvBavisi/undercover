@@ -98,6 +98,8 @@ export default function OfflineGameOver({
     onQuit();
   }
 
+  const WINNING_POINTS = 5;
+
   return (
     <div className="container mx-auto px-4 pt-20 pb-8">
       <Card className="bg-gray-800/70 border-gray-700 max-w-4xl mx-auto">

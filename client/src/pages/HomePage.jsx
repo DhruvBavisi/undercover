@@ -1,12 +1,56 @@
 import { Link } from "react-router-dom"
+import { useAuth } from "../context/AuthContext"
 import { Button } from "../components/ui/button"
-import { Fingerprint, Users, Trophy, Info, Smartphone } from "lucide-react"
+import { 
+  Fingerprint, 
+  Users, 
+  Trophy, 
+  Info, 
+  Smartphone, 
+  User,
+  LogOut
+} from "lucide-react"
+import { avatarOptions } from '../utils/avatars';
+import { 
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "../components/ui/dropdown-menu"
 
 export default function HomePage() {
+  const { isAuthenticated, user, logout } = useAuth();
+
+  // Get avatar by ID
+  const getAvatar = (id) => {
+    return avatarOptions.find(avatar => avatar.id === id) || avatarOptions[0];
+  };
+
+  const currentAvatar = user ? getAvatar(user.avatarId) : null;
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 text-white relative">
-      {/* Floating How to Play button */}
-      <Link to="/how-to-play" className="fixed top-4 right-4 z-50">
+      {/* Authentication buttons */}
+      <div className="fixed top-4 right-4 z-50">
+        {isAuthenticated ? (
+          <Link to="/profile">
+            <div className="h-12 w-12 rounded-full overflow-hidden border-2 border-gray-700 shadow-lg hover:border-white transition-all duration-200">
+              <div className={`h-full w-full bg-gradient-to-r ${currentAvatar.bgColor}`}>
+                <img 
+                  src={currentAvatar.image} 
+                  alt={currentAvatar.name}
+                  className="w-full h-full object-contain"
+                />
+              </div>
+            </div>
+          </Link>
+        ) : null}
+      </div>
+
+      {/* How to Play button */}
+      <Link to="/how-to-play" className="fixed top-4 left-4 z-50">
         <Button className="rounded-full w-12 h-12 p-0 bg-gray-700 hover:bg-gray-600">
           <Info className="h-6 w-6" />
         </Button>
@@ -31,11 +75,15 @@ export default function HomePage() {
                 Play with friends or strangers online. Create a room and share the code, or join an existing game.
               </p>
               <div className="grid grid-cols-1 gap-3 w-full">
-                <Link to="/join">
-                  <Button className="w-full bg-red-600 hover:bg-red-700 text-white">Join Game</Button>
+                <Link to={isAuthenticated ? "/join" : "/login"}>
+                  <Button className="w-full bg-red-600 hover:bg-red-700 text-white">
+                    Join Game
+                  </Button>
                 </Link>
-                <Link to="/create">
-                  <Button className="w-full bg-purple-600 hover:bg-purple-700 text-white">Create Game</Button>
+                <Link to={isAuthenticated ? "/create" : "/login"}>
+                  <Button className="w-full bg-purple-600 hover:bg-purple-700 text-white">
+                    Create Game
+                  </Button>
                 </Link>
               </div>
             </div>
@@ -93,7 +141,7 @@ export default function HomePage() {
         </div>
 
         <footer className="mt-20 text-center text-gray-500 text-sm">
-          <p> 2023 Code Undercover. All rights reserved.</p>
+          <p>© 2023 Code Undercover. All rights reserved.</p>
         </footer>
       </div>
     </div>
