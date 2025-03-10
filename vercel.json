@@ -1,0 +1,21 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "./server/index.js",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/server/index.js"
+    }
+  ],
+  "env": {
+    "NODE_ENV": "production",
+    "MONGODB_URI": "@undercover-mongodb-uri",
+    "JWT_SECRET": "@undercover-jwt-secret",
+    "CLIENT_URL": "https://undercover-game.vercel.app"
+  }
+}

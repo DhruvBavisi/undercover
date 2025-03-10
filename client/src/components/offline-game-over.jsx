@@ -1,11 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from './ui/card';
 import { Home, RotateCcw, UserPlus } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from './ui/dialog';
 import { Avatar, AvatarImage, AvatarFallback } from './ui/avatar';
+import { useNavigate } from 'react-router-dom';
 
 /**
  * @typedef {Object} Player
@@ -36,6 +37,9 @@ export default function OfflineGameOver({
   onAddPlayer,
   onQuit,
 }) {
+  const [showAddPlayerDialog, setShowAddPlayerDialog] = useState(false);
+  const navigate = useNavigate();
+
   // Determine the winning team based on remaining players and Mr. White guess
   const remainingCivilians = players.filter(p => !p.isEliminated && p.role === "Civilian");
   const remainingUndercover = players.filter(p => !p.isEliminated && p.role === "Undercover");
@@ -88,10 +92,20 @@ export default function OfflineGameOver({
   
   const topScorer = getTopScorer();
 
-  const handleAddPlayer = (event) => {
-    event.preventDefault();
-    onAddPlayer();
-  }
+  const handleAddPlayers = () => {
+    // Store current players in localStorage for the setup page
+    const currentPlayers = players.map(player => ({
+      name: player.name,
+      role: player.role
+    }));
+    
+    navigate('/offline', { 
+      state: { 
+        players: currentPlayers,
+        fromGame: true
+      } 
+    });
+  };
 
   const handleQuit = (event) => {
     event.preventDefault();
@@ -195,33 +209,59 @@ export default function OfflineGameOver({
             <RotateCcw className="mr-2 h-4 w-4" />
             Play Again
           </Button>
-          <Button className="!bg-white !text-black hover:!bg-gray-300 !important !w-full sm:w-auto" onClick={handleAddPlayer}>
+          <Button 
+            className="!bg-white !text-black hover:!bg-gray-300 !important !w-full sm:w-auto" 
+            onClick={() => setShowAddPlayerDialog(true)}
+          >
             <UserPlus className="mr-2 h-4 w-4" />
             Add Player
           </Button>
-          <Dialog
-            onOpenAutoFocus={(e) => e.preventDefault()}
-            onCloseAutoFocus={(e) => e.preventDefault()}
-          >
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Add Player</DialogTitle>
-              </DialogHeader>
-              <div className="flex flex-col gap-4">
-                <Input placeholder="Player Name" />
-                <Input placeholder="Player Avatar URL" />
-              </div>
-              <DialogFooter>
-                <Button>Add Player</Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
           <Button className="!bg-red-600 hover:!bg-red-700 w-full sm:w-auto" onClick={handleQuit}>
             <Home className="mr-2 h-4 w-4" />
             Quit
           </Button>
         </CardFooter>
       </Card>
+
+      {/* Add Player Confirmation Dialog */}
+      <Dialog open={showAddPlayerDialog} onOpenChange={setShowAddPlayerDialog}>
+        <DialogContent className="bg-gray-800 text-white border-gray-700">
+          <DialogHeader>
+            <DialogTitle>Add New Players</DialogTitle>
+            <DialogDescription className="text-gray-400">
+              This will take you to the game setup page with your current players. You can add more players there.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-4">
+            <div className="text-sm text-gray-300">
+              Current Players: {players.length}
+            </div>
+            <div className="text-sm text-gray-300">
+              You'll be able to:
+              <ul className="list-disc list-inside mt-2 space-y-1">
+                <li>Add new players</li>
+                <li>Adjust game settings</li>
+                <li>Start a new game with more players</li>
+              </ul>
+            </div>
+          </div>
+          <DialogFooter className="flex gap-2 sm:gap-0">
+            <Button
+              variant="ghost"
+              onClick={() => setShowAddPlayerDialog(false)}
+              className="border border-gray-600"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleAddPlayers}
+              className="bg-purple-600 hover:bg-purple-700"
+            >
+              Continue to Setup
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

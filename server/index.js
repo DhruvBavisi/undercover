@@ -21,7 +21,10 @@ connectDB();
 const app = express();
 const server = http.createServer(app);
 
-// Define allowed origins
+// Enhanced environment configuration
+const isProduction = process.env.NODE_ENV === 'production';
+
+// Configure CORS based on environment
 const allowedOrigins = [
   // Production origins
   process.env.CLIENT_URL,
@@ -32,24 +35,17 @@ const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:5174',
   'http://localhost:5175'
-].filter(Boolean); // Filter out any undefined values
+].filter(Boolean);
 
-console.log('Allowed CORS origins:', allowedOrigins);
-console.log('NODE_ENV:', process.env.NODE_ENV);
-console.log('CLIENT_URL:', process.env.CLIENT_URL);
-
-// Middleware for CORS
-app.use(cors({
+const corsOptions = {
   origin: function(origin, callback) {
-    // Allow requests with no origin (like mobile apps, curl, etc.)
     if (!origin) return callback(null, true);
     
     if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, origin);
     } else {
       console.warn(`HTTP origin not allowed by CORS: ${origin}`);
-      // In development, allow all origins
-      if (process.env.NODE_ENV !== 'production') {
+      if (!isProduction) {
         callback(null, origin);
       } else {
         callback(new Error('Not allowed by CORS'));
@@ -59,28 +55,26 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   credentials: true,
   allowedHeaders: ['Content-Type', 'Authorization']
-}));
+};
+
+// Configure logging based on environment
+if (isProduction) {
+  console.log('Running in production mode');
+  // Add production-specific middleware here
+} else {
+  console.log('Running in development mode');
+  // Add development-specific middleware here
+}
+
+console.log('Allowed CORS origins:', allowedOrigins);
+console.log('NODE_ENV:', process.env.NODE_ENV);
+console.log('CLIENT_URL:', process.env.CLIENT_URL);
+
+// Middleware for CORS
+app.use(cors(corsOptions));
 
 // Add CORS headers for preflight requests
-app.options('*', cors({
-  origin: function(origin, callback) {
-    if (!origin) return callback(null, true);
-    
-    if (allowedOrigins.indexOf(origin) !== -1) {
-      callback(null, origin);
-    } else {
-      // In development, allow all origins
-      if (process.env.NODE_ENV !== 'production') {
-        callback(null, origin);
-      } else {
-        callback(new Error('Not allowed by CORS'));
-      }
-    }
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
+app.options('*', cors(corsOptions));
 
 // Remove the middleware that sets * for Access-Control-Allow-Origin
 // as it conflicts with credentials mode
@@ -96,11 +90,10 @@ const io = new Server(server, {
       if (allowedOrigins.indexOf(origin) !== -1) {
         callback(null, origin);
       } else {
-        // In development, allow all origins
-        if (process.env.NODE_ENV !== 'production') {
+        console.warn(`Socket.io origin not allowed by CORS: ${origin}`);
+        if (!isProduction) {
           callback(null, origin);
         } else {
-          console.warn(`Socket.io origin not allowed by CORS: ${origin}`);
           callback(new Error('Not allowed by CORS'));
         }
       }

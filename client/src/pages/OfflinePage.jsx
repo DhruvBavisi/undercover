@@ -25,15 +25,59 @@ import { useToast } from "../hooks/use-toast"; // Import toast
 export default function OfflinePage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { playerNames: initialPlayerNames = [] } = location.state || {};
+  const { players: initialPlayers = [], fromGame = false } = location.state || {};
   const { toast } = useToast();
-  const [playerCount, setPlayerCount] = useState(initialPlayerNames.length || 3);
+  
+  // Initialize state with existing players if coming from game
+  const [playerCount, setPlayerCount] = useState(() => {
+    // First check location state
+    if (initialPlayers.length > 0) {
+      return initialPlayers.length;
+    }
+    
+    // Then check localStorage
+    const storedSettings = localStorage.getItem("offlineGameSettings");
+    if (storedSettings) {
+      try {
+        const settings = JSON.parse(storedSettings);
+        if (settings.playerCount) {
+          return settings.playerCount;
+        }
+      } catch (error) {
+        console.error("Error parsing stored settings:", error);
+      }
+    }
+    
+    return 3; // Default value
+  });
   const [includeWhite, setIncludeWhite] = useState(true);
   const [undercoverCount, setUndercoverCount] = useState(1);
   const [mrWhiteCount, setMrWhiteCount] = useState(0);
   const [wordCategory, setWordCategory] = useState("general");
-  const [playerNames, setPlayerNames] = useState(initialPlayerNames.length ? initialPlayerNames : Array(3).fill(""));
-  const [nameErrors, setNameErrors] = useState(Array(3).fill(""));
+  
+  // Initialize players state
+  const [players, setPlayers] = useState(() => {
+    // First try to get players from location state
+    if (initialPlayers.length > 0) {
+      return initialPlayers.map(p => p.name);
+    }
+    
+    // Then try localStorage
+    const storedSettings = localStorage.getItem("offlineGameSettings");
+    if (storedSettings) {
+      try {
+        const settings = JSON.parse(storedSettings);
+        if (settings.existingPlayers && settings.existingPlayers.length > 0) {
+          return settings.existingPlayers.map(p => p.name);
+        }
+      } catch (error) {
+        console.error("Error parsing stored settings:", error);
+      }
+    }
+    
+    return Array(3).fill("");
+  });
+  const [nameErrors, setNameErrors] = useState(Array(players.length).fill(""));
   const [rounds, setRounds] = useState(playerCount - 2);
 
   // Refs for player name inputs
@@ -45,10 +89,10 @@ export default function OfflinePage() {
   }, [playerCount]);
 
   useEffect(() => {
-    if (initialPlayerNames.length) {
-      applyRecommendedRoles(initialPlayerNames.length);
+    if (initialPlayers.length) {
+      applyRecommendedRoles(initialPlayers.length);
     }
-  }, [initialPlayerNames]);
+  }, [initialPlayers]);
 
   useEffect(() => {
     // Check if we're returning from the game page to add more players
@@ -63,7 +107,7 @@ export default function OfflinePage() {
           
           // Update state with existing settings
           if (settings.playerNames && settings.playerNames.length > 0) {
-            setPlayerNames(settings.playerNames);
+            setPlayers(settings.playerNames);
             setPlayerCount(settings.playerNames.length);
           }
           
@@ -95,6 +139,55 @@ export default function OfflinePage() {
       localStorage.removeItem("returnToSetup");
     }
   }, []);
+
+  // Effect to handle initial setup when coming from game
+  useEffect(() => {
+    const returnToSetup = localStorage.getItem("returnToSetup");
+    const storedSettings = localStorage.getItem("offlineGameSettings");
+    
+    if ((fromGame && initialPlayers.length > 0) || (returnToSetup === "true" && storedSettings)) {
+      try {
+        // Get player data from either source
+        let playerData;
+        if (initialPlayers.length > 0) {
+          playerData = initialPlayers;
+        } else {
+          const settings = JSON.parse(storedSettings);
+          playerData = settings.existingPlayers || [];
+        }
+
+        if (playerData.length > 0) {
+          // Update all relevant state
+          const playerNames = playerData.map(p => p.name);
+          setPlayers(playerNames);
+          setPlayerCount(playerNames.length);
+          setNameErrors(Array(playerNames.length).fill(""));
+          
+          // Apply recommended roles
+          applyRecommendedRoles(playerNames.length);
+          
+          // Show success toast
+          toast({
+            title: "Players Loaded",
+            description: `Loaded ${playerNames.length} existing players. You can now add more players or adjust settings.`,
+            variant: "default",
+          });
+        }
+
+        // Clean up localStorage
+        if (returnToSetup === "true") {
+          localStorage.removeItem("returnToSetup");
+        }
+      } catch (error) {
+        console.error("Error setting up players:", error);
+        toast({
+          title: "Error Loading Players",
+          description: "There was an error loading the existing players. Starting fresh.",
+          variant: "destructive",
+        });
+      }
+    }
+  }, [fromGame, initialPlayers, toast]);
 
   // Calculate role limits
   const getMaxUndercover = (count) => {
@@ -173,10 +266,10 @@ export default function OfflinePage() {
     setPlayerCount(count);
 
     // Adjust player names array
-    if (count > playerNames.length) {
-      setPlayerNames([
-        ...playerNames,
-        ...Array(count - playerNames.length)
+    if (count > players.length) {
+      setPlayers([
+        ...players,
+        ...Array(count - players.length)
           .fill("")
           .map((_, i) => ""),
       ]);
@@ -187,7 +280,7 @@ export default function OfflinePage() {
           .map((_, i) => ""),
       ]);
     } else {
-      setPlayerNames(playerNames.slice(0, count));
+      setPlayers(players.slice(0, count));
       setNameErrors(nameErrors.slice(0, count));
     }
 
@@ -201,47 +294,46 @@ export default function OfflinePage() {
       setPlayerCount(playerCount + 1);
       
       // Only add a new empty player name if we're adding beyond the current list
-      if (playerCount >= playerNames.length) {
-        setPlayerNames([...playerNames, ""]);
+      if (playerCount >= players.length) {
+        setPlayers([...players, ""]);
         setNameErrors([...nameErrors, ""]);
       }
     }
   };
 
-  const handlePlayerNameChange = (index, name) => {
+  const handlePlayerNameChange = (index, value) => {
+    const name = String(value || '');
     const formattedName = name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
     
     // Check if name already exists in other player slots
-    const isDuplicate = playerNames.some(
+    const isDuplicate = players.some(
       (existingName, i) => i !== index && 
-      existingName.toLowerCase() === formattedName.toLowerCase() && 
-      existingName !== ""
+      String(existingName || '').toLowerCase() === formattedName.toLowerCase() && 
+      existingName !== ''
     );
     
     // Create new arrays for updating state
-    const newPlayerNames = [...playerNames];
+    const newPlayerNames = [...players];
     const newNameErrors = [...nameErrors];
     
     if (isDuplicate) {
-      // Show error message for duplicate name
-      newNameErrors[index] = "Player name already exists";
+      newNameErrors[index] = 'Name already exists';
     } else {
-      // Clear any previous error
-      newNameErrors[index] = "";
+      newNameErrors[index] = '';
     }
     
     // Always update the name in the input field
     newPlayerNames[index] = formattedName;
     
-    setPlayerNames(newPlayerNames);
+    setPlayers(newPlayerNames);
     setNameErrors(newNameErrors);
   };
 
   const handleRemovePlayer = (index) => {
     if (playerCount > 3) {
-      const updatedNames = [...playerNames];
+      const updatedNames = [...players];
       updatedNames.splice(index, 1);
-      setPlayerNames(updatedNames);
+      setPlayers(updatedNames);
       setPlayerCount(playerCount - 1);
 
       const updatedErrors = [...nameErrors];
@@ -292,7 +384,9 @@ export default function OfflinePage() {
 
   const handleStartGame = () => {
     // Filter out empty names
-    const filteredNames = playerNames.filter((name) => name.trim() !== "");
+    const filteredNames = players
+      .map((p) => (typeof p === "string" ? p : p.name || ""))
+      .filter((name) => name.trim() !== "");
     
     // Check if we have at least 3 players
     if (filteredNames.length < 3) {
@@ -305,7 +399,7 @@ export default function OfflinePage() {
     }
     
     // Check if there are any duplicate name errors
-    if (nameErrors.some(error => error !== "")) {
+    if (nameErrors.some((error) => error !== "")) {
       toast({
         title: "Duplicate player names",
         description: "Please fix the duplicate player names before starting.",
@@ -318,7 +412,7 @@ export default function OfflinePage() {
     localStorage.setItem(
       "offlineGameSettings",
       JSON.stringify({
-        playerNames: playerNames.filter((name) => name.trim() !== ""),
+        playerNames: players.filter((name) => name.trim() !== ""),
         playerCount,
         includeWhite,
         undercoverCount,
@@ -332,8 +426,8 @@ export default function OfflinePage() {
     navigate("/offline/game");
   };
 
-  const allPlayersNamed = playerNames.every(
-    (name, index) => name.trim() !== "" || index >= playerCount
+  const allPlayersNamed = players.every(
+    (name, index) => String(name || '').trim() !== '' || index >= playerCount
   );
 
   const calculateCivilians = () => {
@@ -349,6 +443,11 @@ export default function OfflinePage() {
         </Link>
         
         <div className="flex justify-between items-center mb-8">
+          {fromGame && (
+            <div className="text-sm text-gray-400">
+              Adding players to existing game
+            </div>
+          )}
         </div>
 
         <div className="max-w-md mx-auto">
@@ -532,7 +631,7 @@ export default function OfflinePage() {
                         <Input
                           ref={(el) => (inputRefs.current[index] = el)}
                           placeholder={`Player ${index + 1}`}
-                          value={playerNames[index]}
+                          value={players[index]}
                           onChange={(e) => handlePlayerNameChange(index, e.target.value)}
                           onKeyDown={(e) => handleKeyDown(e, index)}
                           className="bg-gray-700 border-gray-600"
@@ -556,7 +655,7 @@ export default function OfflinePage() {
                 <Button
                   onClick={handleStartGame}
                   className="w-full bg-purple-600 hover:bg-purple-700"
-                  disabled={!allPlayersNamed || nameErrors.some(error => error !== "")}
+                  disabled={!allPlayersNamed || nameErrors.some((error) => error !== "")}
                 >
                   Start Offline Game
                 </Button>
