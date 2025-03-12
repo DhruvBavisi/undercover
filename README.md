@@ -1,4 +1,4 @@
-# Undercover Word Game
+# Code - Undercover Word Game
 
 ## Project Overview
 This is a real-time multiplayer word game built with React, Express, and Socket.io. The game allows players to join rooms, guess words, and interact in real-time.
