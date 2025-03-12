@@ -7,6 +7,8 @@ import { Label } from '../components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../components/ui/card';
 import { Alert, AlertDescription } from '../components/ui/alert';
 import { ArrowLeft, AlertCircle, Loader2 } from 'lucide-react';
+import { toast } from "sonner";
+import Starfield from "../components/Starfield";
 
 export default function LoginPage() {
   const [username, setUsername] = useState('');
@@ -47,8 +49,9 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 text-white flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
+    <div className="min-h-screen flex items-center justify-center relative overflow-hidden bg-transparent">
+      <Starfield />
+      <div className="w-full max-w-md p-8 glass-effect rounded-2xl shadow-soft relative z-10">
         <Link to="/" className="inline-flex items-center text-gray-400 hover:text-white mb-6">
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back to Home

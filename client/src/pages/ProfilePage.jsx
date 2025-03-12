@@ -18,6 +18,8 @@ import {
   Camera
 } from 'lucide-react';
 import { avatarOptions } from '../utils/avatars';
+import { toast } from "sonner";
+import Starfield from "../components/Starfield";
 
 export default function ProfilePage() {
   const { user, token, logout, updateProfile, isAuthenticated } = useAuth();
@@ -140,22 +142,9 @@ export default function ProfilePage() {
   const currentAvatar = getAvatar(avatarId);
   
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-800 to-slate-900 text-white">
-      {/* Success Message Toast */}
-      {formSuccess && (
-        <div className={`fixed top-4 left-1/2 transform -translate-x-1/2 z-50 transition-all duration-500 ${
-          fadeSuccess 
-            ? 'opacity-0 -translate-y-full scale-95' 
-            : 'opacity-100 translate-y-0 scale-100'
-        }`}>
-          <Alert className="bg-teal-600 border-teal-700 text-white shadow-lg px-6 py-4 rounded-lg animate-bounce-small">
-            <Check className="h-5 w-5 mr-2" />
-            <AlertDescription className="font-medium">{formSuccess}</AlertDescription>
-          </Alert>
-        </div>
-      )}
-      
-      <div className="container mx-auto max-w-4xl py-8 px-4">
+    <div className="min-h-screen relative overflow-hidden bg-transparent">
+      <Starfield />
+      <div className="container mx-auto px-4 py-8 relative z-10">
         <Link to="/" className="inline-flex items-center text-gray-400 hover:text-white mb-8">
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back to Home

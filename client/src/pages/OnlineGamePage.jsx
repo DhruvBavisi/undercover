@@ -11,6 +11,7 @@ import { Input } from '../components/ui/input';
 import { Textarea } from '../components/ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { API_URL } from '../config';
+import Starfield from "../components/Starfield";
 
 const OnlineGamePage = () => {
   const { gameCode } = useParams();
@@ -573,8 +574,9 @@ const OnlineGamePage = () => {
   // Render waiting room if game hasn't started
   if (room.status === 'waiting') {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 text-white p-4">
-        <div className="container mx-auto max-w-md">
+      <div className="min-h-screen relative overflow-hidden bg-transparent">
+        <Starfield />
+        <div className="container mx-auto max-w-md relative z-10">
           <Button 
             variant="ghost" 
             className="text-gray-400 hover:text-white p-0 mb-8"
@@ -604,8 +606,9 @@ const OnlineGamePage = () => {
 
   // Render game in progress
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 text-white p-4">
-      <div className="container mx-auto max-w-md">
+    <div className="min-h-screen relative overflow-hidden bg-transparent">
+      <Starfield />
+      <div className="container mx-auto max-w-md relative z-10">
         <div className="flex justify-between items-center mb-6">
           <Button 
             variant="ghost" 
@@ -865,8 +868,8 @@ const OnlineGamePage = () => {
                     <Send className="h-4 w-4" />
                   </Button>
                 </form>
-          </div>
-        )}
+              </div>
+            )}
             
             {/* Game Actions */}
             <div className="flex space-x-2">

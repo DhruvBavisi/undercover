@@ -11,6 +11,7 @@ import OfflineGameOver from "../components/offline-game-over"
 import PauseMenu from "../components/pause-menu"
 import { getRandomWordPair, assignRoles, randomizeSpeakingOrder } from "../utils/game-utils"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "../components/ui/dialog"
+import Starfield from "../components/Starfield"
 
 /**
  * @typedef {Object} Player
@@ -303,85 +304,83 @@ export default function OfflineGamePage() {
       )
     }
 
-    switch (gamePhase) {
-      case "pass":
-        return (
-          <OfflinePassDevice
-            playerName={players[currentPlayerIndex].name}
-            playerAvatar={players[currentPlayerIndex].avatar}
-            onContinue={() => setGamePhase("reveal")}
-          />
-        )
-      case "reveal":
-        return (
-          <OfflineRoleReveal
-            player={players[currentPlayerIndex]}
-            onComplete={handleRoleRevealComplete}
-          />
-        )
-      case "voting":
-        return (
-          <OfflineVoting
-            players={players}
-            speakingOrder={speakingOrder}
-            onVoteComplete={handleVoteComplete}
-            round={round}
-          />
-        )
-      case "elimination":
-        const eliminatedPlayer = players.find((p) => p.id === eliminatedPlayerId);
-        return (
-          <OfflineElimination
-            player={eliminatedPlayer}
-            onComplete={handleEliminationComplete}
-            onWhiteGuess={handleWhiteGuess}
-            civilianWord={wordPair[0]}
-          />
-        )
-      case "gameOver":
-        return (
-          <OfflineGameOver
-            players={players}
-            civilianWord={wordPair[0]}
-            undercoverWord={wordPair[1]}
-            scores={scores}
-            whiteGuessCorrect={whiteGuessCorrect}
-            onRestart={handleRestart}
-            onAddPlayer={handleAddPlayer}
-            onQuit={handleQuit}
-          />
-        )
-      default:
-        return null
-    }
+    return (
+      <div className="min-h-screen relative overflow-hidden bg-transparent">
+        <Starfield />
+        <div className="relative z-10">
+          {gamePhase === "pass" && (
+            <OfflinePassDevice
+              playerName={players[currentPlayerIndex].name}
+              playerAvatar={players[currentPlayerIndex].avatar}
+              onContinue={() => setGamePhase("reveal")}
+            />
+          )}
+          {gamePhase === "reveal" && (
+            <OfflineRoleReveal
+              player={players[currentPlayerIndex]}
+              onComplete={handleRoleRevealComplete}
+            />
+          )}
+          {gamePhase === "voting" && (
+            <OfflineVoting
+              players={players}
+              speakingOrder={speakingOrder}
+              onVoteComplete={handleVoteComplete}
+              round={round}
+            />
+          )}
+          {gamePhase === "elimination" && (
+            <OfflineElimination
+              player={players.find((p) => p.id === eliminatedPlayerId)}
+              onComplete={handleEliminationComplete}
+              onWhiteGuess={handleWhiteGuess}
+              civilianWord={wordPair[0]}
+            />
+          )}
+          {gamePhase === "gameOver" && (
+            <OfflineGameOver
+              players={players}
+              civilianWord={wordPair[0]}
+              undercoverWord={wordPair[1]}
+              scores={scores}
+              whiteGuessCorrect={whiteGuessCorrect}
+              onRestart={handleRestart}
+              onAddPlayer={handleAddPlayer}
+              onQuit={handleQuit}
+            />
+          )}
+        </div>
+      </div>
+    )
   }
 
   return (
-    <>
-      <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 text-white relative">
-        <div className="absolute top-4 right-4 flex items-center gap-4">
-          <Badge variant="outline" className="text-lg py-1 px-3">
-            Round {round}
-          </Badge>
-          <Button
-            variant="outline"
-            size="icon"
-            className="h-9 w-9"
-            onClick={() => setIsPaused(true)}
-          >
-            <Pause className="h-4 w-4" />
-          </Button>
-        </div>
+    <div className="min-h-screen relative overflow-hidden bg-transparent">
+      <Starfield />
+      <div className="relative z-10">
         {renderGamePhase()}
-        {isPaused && (
-          <PauseMenu
-            onResume={() => setIsPaused(false)}
-            onRestart={handleRestart}
-            onQuit={handleQuit}
-            onAddPlayer={handleAddPlayer}
-          />
-        )}
       </div>
+      <div className="absolute top-4 right-4 flex items-center gap-4">
+        <Badge variant="outline" className="text-lg py-1 px-3">
+          Round {round}
+        </Badge>
+        <Button
+          variant="outline"
+          size="icon"
+          className="h-9 w-9"
+          onClick={() => setIsPaused(true)}
+        >
+          <Pause className="h-4 w-4" />
+        </Button>
+      </div>
+      {isPaused && (
+        <PauseMenu
+          onResume={() => setIsPaused(false)}
+          onRestart={handleRestart}
+          onQuit={handleQuit}
+          onAddPlayer={handleAddPlayer}
+        />
+      )}
       <Dialog open={showQuitConfirm} onOpenChange={setShowQuitConfirm}>
         <DialogContent className="bg-gray-800 text-white">
           <DialogHeader>
@@ -418,6 +417,6 @@ export default function OfflineGamePage() {
           </div>
         </DialogContent>
       </Dialog>
-    </>
+    </div>
   )
 }

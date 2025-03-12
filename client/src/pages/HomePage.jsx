@@ -8,9 +8,7 @@ import {
   Info, 
   Smartphone, 
   User,
-  LogOut,
-  Moon,
-  Sun
+  LogOut
 } from "lucide-react"
 import { avatarOptions } from '../utils/avatars';
 import { 
@@ -21,11 +19,182 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "../components/ui/dropdown-menu"
-import { useTheme } from "../components/theme-provider"
+import { motion } from "framer-motion"
+import { useEffect } from "react"
+import Starfield from "../components/Starfield"
+
+// Custom scrollbar styles
+const scrollbarStyles = `
+  /* Override global scrollbar styles */
+  html, body, #root, .min-h-screen {
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+  }
+
+  html::-webkit-scrollbar,
+  body::-webkit-scrollbar,
+  #root::-webkit-scrollbar,
+  .min-h-screen::-webkit-scrollbar {
+    width: 8px !important;
+    height: 8px !important;
+    background: transparent !important;
+  }
+
+  html::-webkit-scrollbar-track,
+  body::-webkit-scrollbar-track,
+  #root::-webkit-scrollbar-track,
+  .min-h-screen::-webkit-scrollbar-track {
+    background: transparent !important;
+    display: none !important;
+  }
+
+  html::-webkit-scrollbar-thumb,
+  body::-webkit-scrollbar-thumb,
+  #root::-webkit-scrollbar-thumb,
+  .min-h-screen::-webkit-scrollbar-thumb {
+    background: #4f46e5 !important;
+    border-radius: 4px !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  }
+
+  html::-webkit-scrollbar-thumb:hover,
+  body::-webkit-scrollbar-thumb:hover,
+  #root::-webkit-scrollbar-thumb:hover,
+  .min-h-screen::-webkit-scrollbar-thumb:hover {
+    background: #6366f1 !important;
+  }
+
+  html::-webkit-scrollbar-button,
+  body::-webkit-scrollbar-button,
+  #root::-webkit-scrollbar-button,
+  .min-h-screen::-webkit-scrollbar-button {
+    display: none !important;
+  }
+
+  /* Override specific container styles */
+  .overflow-auto,
+  .overflow-y-auto,
+  .overflow-x-auto {
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+  }
+
+  .overflow-auto::-webkit-scrollbar,
+  .overflow-y-auto::-webkit-scrollbar,
+  .overflow-x-auto::-webkit-scrollbar {
+    width: 8px !important;
+    height: 8px !important;
+    background: transparent !important;
+  }
+
+  .overflow-auto::-webkit-scrollbar-track,
+  .overflow-y-auto::-webkit-scrollbar-track,
+  .overflow-x-auto::-webkit-scrollbar-track {
+    background: transparent !important;
+    display: none !important;
+  }
+
+  .overflow-auto::-webkit-scrollbar-thumb,
+  .overflow-y-auto::-webkit-scrollbar-thumb,
+  .overflow-x-auto::-webkit-scrollbar-thumb {
+    background: #4f46e5 !important;
+    border-radius: 4px !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  }
+
+  .overflow-auto::-webkit-scrollbar-thumb:hover,
+  .overflow-y-auto::-webkit-scrollbar-thumb:hover,
+  .overflow-x-auto::-webkit-scrollbar-thumb:hover {
+    background: #6366f1 !important;
+  }
+
+  .overflow-auto::-webkit-scrollbar-button,
+  .overflow-y-auto::-webkit-scrollbar-button,
+  .overflow-x-auto::-webkit-scrollbar-button {
+    display: none !important;
+  }
+
+  /* Override dark mode styles */
+  .dark html::-webkit-scrollbar-thumb,
+  .dark body::-webkit-scrollbar-thumb,
+  .dark #root::-webkit-scrollbar-thumb,
+  .dark .min-h-screen::-webkit-scrollbar-thumb {
+    background: #4f46e5 !important;
+  }
+
+  .dark .overflow-auto::-webkit-scrollbar-thumb,
+  .dark .overflow-y-auto::-webkit-scrollbar-thumb,
+  .dark .overflow-x-auto::-webkit-scrollbar-thumb {
+    background: #4f46e5 !important;
+  }
+`;
+
+const BackgroundCircles = () => {
+  return (
+    <div className="fixed inset-0 overflow-hidden pointer-events-none z-10">
+      {/* Top-left circle */}
+      <motion.div
+        className="absolute rounded-full"
+        style={{
+          width: '90vh',
+          height: '90vh',
+          backgroundColor: 'var(--primary)',
+          opacity: 0.1,
+          top: '-45vh',
+          left: '-45vh',
+        }}
+        animate={{
+          scale: [1, 1.05, 1],
+          opacity: [0.1, 0.15, 0.1]
+        }}
+        transition={{
+          duration: 8,
+          ease: 'easeInOut',
+          repeat: Infinity,
+          repeatType: 'mirror'
+        }}
+      />
+
+      {/* Bottom-right circle */}
+      <motion.div
+        className="absolute rounded-full"
+        style={{
+          width: '90vh',
+          height: '90vh',
+          backgroundColor: 'var(--secondary)',
+          opacity: 0.1,
+          bottom: '-45vh',
+          right: '-45vh',
+        }}
+        animate={{
+          scale: [1, 1.05, 1],
+          opacity: [0.1, 0.15, 0.1]
+        }}
+        transition={{
+          duration: 8,
+          ease: 'easeInOut',
+          repeat: Infinity,
+          repeatType: 'mirror',
+          delay: 4
+        }}
+      />
+    </div>
+  );
+};
 
 export default function HomePage() {
   const { isAuthenticated, user, logout } = useAuth();
-  const { theme, setTheme } = useTheme();
+
+  // Add scrollbar styles to the document
+  useEffect(() => {
+    const styleSheet = document.createElement("style");
+    styleSheet.innerText = scrollbarStyles;
+    document.head.appendChild(styleSheet);
+
+    return () => {
+      document.head.removeChild(styleSheet);
+    };
+  }, []);
 
   // Get avatar by ID
   const getAvatar = (id) => {
@@ -35,90 +204,87 @@ export default function HomePage() {
   const currentAvatar = user ? getAvatar(user.avatarId) : null;
 
   return (
-    <div className="min-h-screen bg-background text-foreground animate-fade-in relative overflow-hidden">
+    <div className="min-h-screen text-foreground animate-fade-in relative overflow-hidden bg-transparent">
+      {/* Starfield background */}
+      <Starfield />
+      
       {/* Animated background circles */}
-      <div className="animated-background">
-        <div className="animated-circle"></div>
-        <div className="animated-circle"></div>
-        <div className="animated-circle"></div>
-        <div className="animated-circle"></div>
-      </div>
+      <BackgroundCircles />
       
       {/* Header with navigation */}
-      <header className="fixed top-0 left-0 right-0 z-50 glass-effect">
-        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-          <Link to="/" className="flex items-center">
-            <div></div>
-          </Link>
-          
-          <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-              className="rounded-full"
-            >
-              {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-            </Button>
-            
-            <Link to="/how-to-play">
-              <Button variant="ghost" className="text-muted-foreground hover:text-foreground">
-                How to Play
-              </Button>
+      <header className="fixed top-0 left-0 right-0 z-50 backdrop-blur-sm bg-background/30 border-b border-border/20">
+        <div className="container mx-auto px-4 py-3">
+          <div className="flex items-center justify-between">
+            {/* Logo/Brand */}
+            <Link to="/" className="flex items-center">
+              <h1 className="text-xl font-bold gradient-text">Code Undercover</h1>
             </Link>
             
-            {isAuthenticated ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="rounded-full p-0 h-10 w-10 overflow-hidden profile-picture-container">
-                    <div className={`h-full w-full bg-gradient-to-r ${currentAvatar.bgColor} flex items-center justify-center`}>
-                      <img 
-                        src={currentAvatar.image} 
-                        alt={currentAvatar.name}
-                        className="w-[75%] h-[75%] object-contain"
-                      />
-                    </div>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuLabel>My Account</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <Link to="/profile">
-                    <DropdownMenuItem>
+            {/* Navigation Links */}
+            <div className="flex items-center gap-6">
+              <Link to="/how-to-play">
+                <Button variant="ghost" className="text-muted-foreground hover:text-foreground">
+                  How to Play
+                </Button>
+              </Link>
+              
+              {/* Account Menu */}
+              {isAuthenticated ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" className="rounded-full p-0 h-10 w-10 overflow-hidden profile-picture-container hover:bg-background/50">
+                      <div className={`h-full w-full bg-gradient-to-r ${currentAvatar.bgColor} flex items-center justify-center`}>
+                        <img 
+                          src={currentAvatar.image} 
+                          alt={currentAvatar.name}
+                          className="w-[75%] h-[75%] object-contain"
+                        />
+                      </div>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56">
+                    <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <Link to="/profile">
+                      <DropdownMenuItem>
+                        <User className="mr-2 h-4 w-4" />
+                        <span>Profile</span>
+                      </DropdownMenuItem>
+                    </Link>
+                    <DropdownMenuItem onClick={logout}>
+                      <LogOut className="mr-2 h-4 w-4" />
+                      <span>Log out</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button 
+                      style={{ background: "var(--gradient-primary)" }}
+                      className="hover:opacity-90 transition-opacity"
+                    >
                       <User className="mr-2 h-4 w-4" />
-                      <span>Profile</span>
-                    </DropdownMenuItem>
-                  </Link>
-                  <DropdownMenuItem onClick={logout}>
-                    <LogOut className="mr-2 h-4 w-4" />
-                    <span>Log out</span>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ) : (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button style={{ background: "var(--gradient-primary)" }}>
-                    <User className="mr-2 h-4 w-4" />
-                    Account
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                  <Link to="/login">
-                    <DropdownMenuItem>
-                      <LogOut className="mr-2 h-4 w-4 rotate-180" />
-                      <span>Log in</span>
-                    </DropdownMenuItem>
-                  </Link>
-                  <Link to="/register">
-                    <DropdownMenuItem>
-                      <User className="mr-2 h-4 w-4" />
-                      <span>Sign up</span>
-                    </DropdownMenuItem>
-                  </Link>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
+                      Account
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56">
+                    <Link to="/login">
+                      <DropdownMenuItem>
+                        <LogOut className="mr-2 h-4 w-4 rotate-180" />
+                        <span>Log in</span>
+                      </DropdownMenuItem>
+                    </Link>
+                    <Link to="/register">
+                      <DropdownMenuItem>
+                        <User className="mr-2 h-4 w-4" />
+                        <span>Sign up</span>
+                      </DropdownMenuItem>
+                    </Link>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+            </div>
           </div>
         </div>
       </header>
@@ -223,7 +389,7 @@ export default function HomePage() {
         </section>
 
         <footer className="mt-20 text-center text-muted-foreground text-sm">
-          <p>© 2023 Code Undercover. All rights reserved.</p>
+          <p> 2023 Code Undercover. All rights reserved.</p>
         </footer>
       </div>
     </div>

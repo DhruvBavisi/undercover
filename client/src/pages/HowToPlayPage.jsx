@@ -2,11 +2,13 @@ import { Link } from "react-router-dom"
 import { Button } from "../components/ui/button"
 import { ArrowLeft, User, UserX, AlertTriangle, MessageCircle, Vote, Award } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card"
+import Starfield from "../components/Starfield"
 
 export default function HowToPlayPage() {
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 text-white">
-      <div className="container mx-auto px-4 py-12">
+    <div className="min-h-screen relative overflow-hidden bg-transparent">
+      <Starfield />
+      <div className="container mx-auto px-4 py-8 relative z-10">
         <Link to="/" className="inline-flex items-center text-gray-400 hover:text-white mb-8">
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back to Home
