@@ -24,7 +24,7 @@ export default function GamePlayerCard({ player, onVote, canVote }) {
   
   return (
     <Card className={cn(
-      "overflow-hidden transition-all duration-300 border shadow-soft",
+      "overflow-hidden transition-all duration-300 border shadow-soft opacity-80",
       isEliminated ? "opacity-60" : "card-hover",
       isCurrentPlayer && "ring-2 ring-primary"
     )}>

@@ -24,6 +24,15 @@ import { useEffect } from "react"
 import Starfield from "../components/Starfield"
 
 // Custom scrollbar styles
+const customStyles = `
+  .custom-opacity {
+    opacity: 0.7 !important;
+  }
+  .custom-opacity > * {
+    opacity: 1 !important;
+  }
+`;
+
 const scrollbarStyles = `
   /* Override global scrollbar styles */
   html, body, #root, .min-h-screen {
@@ -188,7 +197,7 @@ export default function HomePage() {
   // Add scrollbar styles to the document
   useEffect(() => {
     const styleSheet = document.createElement("style");
-    styleSheet.innerText = scrollbarStyles;
+    styleSheet.innerText = `${customStyles}${scrollbarStyles}`;
     document.head.appendChild(styleSheet);
 
     return () => {
@@ -217,7 +226,7 @@ export default function HomePage() {
           <div className="flex items-center justify-between">
             {/* Logo/Brand */}
             <Link to="/" className="flex items-center">
-              <h1 className="text-xl font-bold gradient-text">Code Undercover</h1>
+              <h1 className="text-xl font-bold gradient-text italic">CU</h1>
             </Link>
             
             {/* Navigation Links */}
@@ -301,7 +310,7 @@ export default function HomePage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
-            <div className="glass-effect rounded-2xl p-8 shadow-soft card-hover">
+            <div className="glass-effect rounded-2xl p-8 shadow-soft card-hover custom-opacity">
               <div className="flex flex-col items-center text-center space-y-6">
                 <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
                   <Fingerprint className="h-8 w-8 text-primary" />
@@ -325,7 +334,7 @@ export default function HomePage() {
               </div>
             </div>
 
-            <div className="glass-effect rounded-2xl p-8 shadow-soft card-hover">
+            <div className="glass-effect rounded-2xl p-8 shadow-soft card-hover custom-opacity">
               <div className="flex flex-col items-center text-center space-y-6">
                 <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
                   <Smartphone className="h-8 w-8 text-primary" />
@@ -350,7 +359,7 @@ export default function HomePage() {
         <section className="py-16">
           <h2 className="text-3xl font-bold text-center mb-12 gradient-text">Game Features</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-            <div className="glass-effect rounded-xl p-6 card-hover">
+            <div className="glass-effect rounded-xl p-6 card-hover custom-opacity">
               <div className="flex flex-col items-center text-center">
                 <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
                   <Users className="h-6 w-6 text-primary" />
@@ -362,7 +371,7 @@ export default function HomePage() {
               </div>
             </div>
 
-            <div className="glass-effect rounded-xl p-6 card-hover">
+            <div className="glass-effect rounded-xl p-6 card-hover custom-opacity">
               <div className="flex flex-col items-center text-center">
                 <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
                   <Trophy className="h-6 w-6 text-primary" />
@@ -374,7 +383,7 @@ export default function HomePage() {
               </div>
             </div>
 
-            <div className="glass-effect rounded-xl p-6 card-hover">
+            <div className="glass-effect rounded-xl p-6 card-hover custom-opacity">
               <div className="flex flex-col items-center text-center">
                 <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
                   <Info className="h-6 w-6 text-primary" />
