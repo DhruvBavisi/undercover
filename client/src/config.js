@@ -4,7 +4,7 @@ export const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3
 
 // Game configuration
 export const MAX_PLAYERS = 12;
-export const MIN_PLAYERS = 4;
+export const MIN_PLAYERS = 3;
 export const DEFAULT_ROUND_TIME = 60; // seconds
 
 // Environment configuration

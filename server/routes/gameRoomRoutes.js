@@ -20,7 +20,7 @@ router.get('/wordpacks', (req, res) => {
 // Create a new game room
 router.post('/rooms', auth, async (req, res) => {
   try {
-    const { settings } = req.body;
+    const { settings = {} } = req.body;
     const userId = req.user.id;
     
     // Get user details
@@ -40,6 +40,47 @@ router.post('/rooms', auth, async (req, res) => {
         isUnique = true;
       }
     }
+
+    // Validate settings
+    if (!settings.maxPlayers || settings.maxPlayers < 3 || settings.maxPlayers > 20) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Invalid maxPlayers value. Must be between 3 and 20.' 
+      });
+    }
+
+    if (!settings.roundTime || settings.roundTime < 30 || settings.roundTime > 180) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Invalid roundTime value. Must be between 30 and 180 seconds.' 
+      });
+    }
+
+    if (!settings.wordPack) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'wordPack is required.' 
+      });
+    }
+
+    // Ensure numUndercovers and numMrWhites are valid
+    const totalSpecialRoles = (settings.numUndercovers || 0) + (settings.numMrWhites || 0);
+    if (totalSpecialRoles >= settings.maxPlayers) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Too many special roles for the given number of players.' 
+      });
+    }
+
+    // Create validated settings object
+    const validatedSettings = {
+      maxPlayers: settings.maxPlayers,
+      roundTime: settings.roundTime,
+      wordPack: settings.wordPack,
+      numUndercovers: settings.numUndercovers || 1,
+      numMrWhites: settings.numMrWhites || 0,
+      customWords: settings.customWords || {}
+    };
     
     // Create the game room
     const gameRoom = new GameRoom({
@@ -52,7 +93,7 @@ router.post('/rooms', auth, async (req, res) => {
         avatarId: user.avatarId || 1,
         isReady: true // Host is automatically ready
       }],
-      settings: settings || {}
+      settings: validatedSettings
     });
     
     await gameRoom.save();
@@ -69,7 +110,7 @@ router.post('/rooms', auth, async (req, res) => {
     });
   } catch (error) {
     console.error('Error creating game room:', error);
-    res.status(500).json({ success: false, message: 'Server error' });
+    res.status(500).json({ success: false, message: error.message || 'Server error' });
   }
 });
 
@@ -431,6 +472,83 @@ router.post('/rooms/:roomCode/reset', auth, async (req, res) => {
     });
   } catch (error) {
     console.error('Error resetting game:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Start the game
+router.post('/rooms/:roomCode/start', auth, async (req, res) => {
+  try {
+    const { roomCode } = req.params;
+    const userId = req.user.id;
+    
+    // Find the game room
+    const gameRoom = await GameRoom.findOne({ roomCode: roomCode.toUpperCase() });
+    if (!gameRoom) {
+      return res.status(404).json({ success: false, message: 'Game room not found' });
+    }
+    
+    // Check if the user is the host
+    if (gameRoom.hostId.toString() !== userId) {
+      return res.status(403).json({ success: false, message: 'Only the host can start the game' });
+    }
+    
+    // Check if the game is already in progress
+    if (gameRoom.status !== 'waiting') {
+      return res.status(400).json({ success: false, message: 'Game is already in progress' });
+    }
+    
+    // Check if there are enough players
+    if (gameRoom.players.length < 3) {
+      return res.status(400).json({ success: false, message: 'Need at least 3 players to start the game' });
+    }
+    
+    // Check if all players are ready
+    if (!gameRoom.players.every(player => player.isReady)) {
+      return res.status(400).json({ success: false, message: 'All players must be ready to start the game' });
+    }
+    
+    // Start the game
+    try {
+      gameRoom.startGame();
+      await gameRoom.save();
+      
+      // Get the socket.io instance
+      const io = req.app.get('io');
+      if (io) {
+        // Notify all clients that the game has started
+        io.to(roomCode.toUpperCase()).emit('game-started', {
+          roomCode: gameRoom.roomCode,
+          status: gameRoom.status,
+          currentRound: gameRoom.currentRound,
+          currentPhase: gameRoom.currentPhase
+        });
+        
+        // Send private role and word info to each player
+        gameRoom.players.forEach(player => {
+          io.to(roomCode.toUpperCase()).emit(`role-${player.userId}`, {
+            role: player.role,
+            word: player.word
+          });
+        });
+      }
+      
+      res.json({
+        success: true,
+        message: 'Game started successfully',
+        room: {
+          roomCode: gameRoom.roomCode,
+          status: gameRoom.status,
+          currentRound: gameRoom.currentRound,
+          currentPhase: gameRoom.currentPhase
+        }
+      });
+    } catch (error) {
+      console.error('Error starting game:', error);
+      return res.status(400).json({ success: false, message: error.message });
+    }
+  } catch (error) {
+    console.error('Error starting game:', error);
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });

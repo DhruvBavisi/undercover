@@ -396,7 +396,7 @@ const OnlineGamePage = () => {
     setIsProcessing(true);
     
     // Reset game state on server
-    fetch(`${API_URL}/api/game-rooms/rooms/${room.roomCode}/reset`, {
+    fetch(`${API_URL}/game-rooms/rooms/${room.roomCode}/reset`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -431,20 +431,102 @@ const OnlineGamePage = () => {
   // Handle Mr. White guess
   const handleMrWhiteGuess = (e) => {
     e.preventDefault();
-    
-    if (!wordGuess.trim()) return;
+    if (!wordGuess.trim() || isGuessing) return;
     
     setIsGuessing(true);
     
+    // Send guess to server
     const socket = window.socket;
     if (socket && room) {
       socket.emit('mr-white-guess', {
-        gameCode: room.roomCode,
+        gameCode,
         playerId: user.id,
         word: wordGuess.trim()
       });
     }
+    
+    // Reset form
+    setWordGuess('');
   };
+
+  // Render Mr. White dialog
+  const renderMrWhiteDialog = () => {
+    return (
+      <Dialog open={showMrWhiteDialog} onOpenChange={setShowMrWhiteDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Mr. White's Last Chance</DialogTitle>
+            <DialogDescription>
+              You've been caught! As Mr. White, you have one chance to guess the civilian's word and win the game.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <form onSubmit={handleMrWhiteGuess} className="space-y-4 mt-4">
+            <Input
+              placeholder="Enter your guess..."
+              value={wordGuess}
+              onChange={(e) => setWordGuess(e.target.value)}
+              disabled={isGuessing}
+              autoFocus
+            />
+            
+            {guessResult && (
+              <Alert className={guessResult.isCorrect ? 'bg-green-500/20' : 'bg-red-500/20'}>
+                <AlertDescription>
+                  {guessResult.isCorrect 
+                    ? 'Correct! You win the game!' 
+                    : `Wrong guess. The correct word was "${guessResult.correctWord}".`}
+                </AlertDescription>
+              </Alert>
+            )}
+            
+            <DialogFooter>
+              <Button 
+                type="submit" 
+                disabled={!wordGuess.trim() || isGuessing}
+                className="w-full"
+              >
+                {isGuessing ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : null}
+                Submit Guess
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+    );
+  };
+
+  // Add socket listener for Mr. White guess result
+  useEffect(() => {
+    if (!socket || !isStable) return;
+    
+    const handleMrWhiteGuessResult = (result) => {
+      console.log('Mr. White guess result:', result);
+      setGuessResult(result);
+      setIsGuessing(false);
+      
+      // If game is over, update game state
+      if (result.gameOver) {
+        setGameWinner(result.winner);
+        setGamePhase('gameOver');
+      }
+    };
+    
+    socket.on('mr-white-guess-result', handleMrWhiteGuessResult);
+    
+    return () => {
+      socket.off('mr-white-guess-result', handleMrWhiteGuessResult);
+    };
+  }, [socket, isStable]);
+
+  // Show Mr. White dialog when player is eliminated and is Mr. White
+  useEffect(() => {
+    if (playerRole === 'mrwhite' && eliminatedPlayer?.id === user.id) {
+      setShowMrWhiteDialog(true);
+    }
+  }, [playerRole, eliminatedPlayer, user.id]);
 
   // Render loading state
   if (!initialFetchDone || loading) {
@@ -560,11 +642,16 @@ const OnlineGamePage = () => {
                 playerRole === 'undercover' ? 'bg-red-900/30 border border-red-800' :
                 'bg-purple-900/30 border border-purple-800'
               }`}>
-                <div className="flex items-center justify-center mb-3">
+                <div className="flex items-center justify-center mb-3 relative w-24 h-24 mx-auto">
+                  <div className={`absolute inset-0 rounded-full ${
+                    playerRole === 'civilian' ? 'bg-gradient-to-br from-blue-500 to-blue-800' :
+                    playerRole === 'undercover' ? 'bg-gradient-to-br from-red-500 to-red-800' :
+                    'bg-gradient-to-br from-purple-500 to-purple-800'
+                  }`}></div>
                   <img 
                     src={`/avatars/${playerRole}.png`} 
                     alt={playerRole}
-                    className="w-16 h-16 rounded-full border-2 border-white/20"
+                    className="w-[75%] h-[75%] object-contain absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2"
                   />
                 </div>
                 <p className="font-bold text-lg mb-2">
@@ -880,64 +967,7 @@ const OnlineGamePage = () => {
       </Dialog>
 
       {/* Mr. White Dialog */}
-      <Dialog open={showMrWhiteDialog} onOpenChange={setShowMrWhiteDialog}>
-        <DialogContent className="bg-gray-800 border-gray-700 text-white max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="text-2xl">Last Chance!</DialogTitle>
-            <DialogDescription className="text-gray-400">
-              You've been eliminated as Mr. White! This is your last chance to win.
-              If you can guess the correct word, you'll win the game!
-            </DialogDescription>
-          </DialogHeader>
-          
-          <form onSubmit={handleMrWhiteGuess} className="space-y-4 my-4">
-            <div className="space-y-2">
-              <label htmlFor="wordGuess" className="text-sm font-medium">
-                Enter your guess:
-              </label>
-              <Input
-                id="wordGuess"
-                value={wordGuess}
-                onChange={(e) => setWordGuess(e.target.value)}
-                placeholder="Type your guess here..."
-                className="bg-gray-700 border-gray-600"
-                disabled={isGuessing}
-              />
-            </div>
-            
-            {guessResult && !guessResult.success && (
-              <Alert variant="destructive">
-                <AlertDescription>
-                  {guessResult.message}
-                </AlertDescription>
-              </Alert>
-            )}
-            
-            <DialogFooter className="flex flex-col sm:flex-row gap-2">
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => setShowMrWhiteDialog(false)}
-                className="w-full sm:w-auto"
-                disabled={isGuessing}
-              >
-                Give Up
-              </Button>
-              <Button
-                type="submit"
-                className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700"
-                disabled={!wordGuess.trim() || isGuessing}
-              >
-                {isGuessing ? (
-                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Submitting...</>
-                ) : (
-                  'Submit Guess'
-                )}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+      {renderMrWhiteDialog()}
     </div>
   );
 };

@@ -165,7 +165,7 @@ const wordPairs = [
   ['Moringa', 'Miracle Tree'],
   ['Maca', 'Peruvian Root'],
   ['Reishi', 'Medicinal Mushroom'],
-  ['Lion's Mane', 'Nerve Mushroom'],
+  ['Lion\'s Mane', 'Nerve Mushroom'],
   ['Chaga', 'Immunity Mushroom'],
   ['Cordyceps', 'Energy Mushroom'],
   ['Cacao', 'Raw Chocolate'],

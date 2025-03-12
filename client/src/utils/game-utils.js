@@ -1,3 +1,6 @@
+// Import word pairs
+import wordPairsData from '../data/word-pairs.js';
+
 /**
  * Get a random word pair for the game
  * @param {string} category - The category of words to use
@@ -5,9 +8,6 @@
  */
 // Keep track of used word pairs to prevent repetition
 const usedWordPairs = new Set();
-
-// Import word pairs
-import wordPairsData from '../data/word-pairs.js';
 
 export function getRandomWordPair(category = 'general') {
   // If all word pairs have been used, reset the tracking

@@ -34,27 +34,39 @@ const allowedOrigins = [
   // Development origins
   'http://localhost:5173',
   'http://localhost:5174',
-  'http://localhost:5175'
+  'http://localhost:5175',
+  'http://localhost:5176',
+  'http://localhost:5177',
+  'http://localhost:5178',
+  'http://localhost:5179',
+  'http://localhost:5180',
+  'http://localhost:5181',
+  'http://localhost:5182',
+  'http://localhost:5183',
+  'http://localhost:5184',
+  'http://localhost:5185'
 ].filter(Boolean);
 
 const corsOptions = {
   origin: function(origin, callback) {
+    // Allow requests with no origin (like mobile apps, curl, etc)
     if (!origin) return callback(null, true);
     
     if (allowedOrigins.indexOf(origin) !== -1) {
-      callback(null, origin);
+      callback(null, true);
     } else {
       console.warn(`HTTP origin not allowed by CORS: ${origin}`);
       if (!isProduction) {
-        callback(null, origin);
+        // In development, allow all origins
+        callback(null, true);
       } else {
         callback(new Error('Not allowed by CORS'));
       }
     }
   },
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   credentials: true,
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 };
 
 // Configure logging based on environment
@@ -76,8 +88,17 @@ app.use(cors(corsOptions));
 // Add CORS headers for preflight requests
 app.options('*', cors(corsOptions));
 
-// Remove the middleware that sets * for Access-Control-Allow-Origin
-// as it conflicts with credentials mode
+// Add a middleware to set CORS headers for all responses
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (allowedOrigins.includes(origin) || !isProduction) {
+    res.header('Access-Control-Allow-Origin', origin || '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+    res.header('Access-Control-Allow-Credentials', 'true');
+  }
+  next();
+});
 
 app.use(express.json());
 
@@ -125,8 +146,29 @@ app.get('/', (req, res) => {
 app.set('io', io);
 
 // Socket.io connection
+const userSocketMap = {}; // Map to track user IDs to socket IDs
+
 io.on('connection', (socket) => {
   console.log('New client connected:', socket.id);
+
+  // Store user ID to socket ID mapping when user authenticates
+  socket.on('authenticate', (data) => {
+    if (data && data.userId) {
+      userSocketMap[data.userId] = socket.id;
+      console.log(`User ${data.userId} authenticated with socket ${socket.id}`);
+    }
+  });
+
+  // Clean up mapping on disconnect
+  socket.on('disconnect', () => {
+    console.log('Client disconnected:', socket.id);
+    // Remove user from socket map
+    Object.keys(userSocketMap).forEach(userId => {
+      if (userSocketMap[userId] === socket.id) {
+        delete userSocketMap[userId];
+      }
+    });
+  });
 
   // Join a game room
   socket.on('join-game', async (data) => {
@@ -276,6 +318,12 @@ io.on('connection', (socket) => {
     const { roomCode, userId } = data;
     
     try {
+      // Store socket ID in userSocketMap
+      if (userId) {
+        userSocketMap[userId.toString()] = socket.id;
+        console.log(`User ${userId} joined room ${roomCode} with socket ${socket.id}`);
+      }
+      
       // Join the socket room
       socket.join(roomCode);
       console.log(`User ${userId} joined room: ${roomCode}`);
@@ -350,73 +398,37 @@ io.on('connection', (socket) => {
           return;
         }
         
-        // Assign roles and words
-        const { numUndercovers, numMrWhites } = gameRoom.settings;
-        const totalPlayers = gameRoom.players.length;
-        
-        // Get word pair
-        const [civilianWord, undercoverWord] = getRandomWordPair(gameRoom.settings.wordPack);
-        gameRoom.words = {
-          civilian: civilianWord,
-          undercover: undercoverWord
-        };
-        
-        // Shuffle players for random role assignment
-        const shuffledIndices = Array.from({ length: totalPlayers }, (_, i) => i)
-          .sort(() => Math.random() - 0.5);
-        
-        // Assign roles
-        let assignedUndercovers = 0;
-        let assignedMrWhites = 0;
-        
-        for (let i = 0; i < totalPlayers; i++) {
-          const playerIndex = shuffledIndices[i];
-          let role = 'civilian';
-          let word = civilianWord;
+        // Start the game using the model's method
+        try {
+          gameRoom.startGame();
+          await gameRoom.save();
           
-          if (assignedUndercovers < numUndercovers) {
-            role = 'undercover';
-            word = undercoverWord;
-            assignedUndercovers++;
-          } else if (assignedMrWhites < numMrWhites) {
-            role = 'mrwhite';
-            word = '';
-            assignedMrWhites++;
-          }
-          
-          gameRoom.players[playerIndex].role = role;
-          gameRoom.players[playerIndex].word = word;
-        }
-        
-        // Update game status
-        gameRoom.status = 'in-progress';
-        gameRoom.currentRound = 1;
-        gameRoom.currentPhase = 'discussion';
-        
-        // Initialize first round with first player's turn
-        gameRoom.rounds.push({
-          roundNumber: 1,
-          playerTurn: gameRoom.players[0].userId,
-          votes: []
-        });
-        
-        await gameRoom.save();
-        
-        // Notify all clients that game has started
-        io.to(roomCode).emit('game-started', {
-          roomCode: gameRoom.roomCode,
-          status: gameRoom.status,
-          currentRound: gameRoom.currentRound,
-          currentPhase: gameRoom.currentPhase
-        });
-        
-        // Send private role and word info to each player
-        gameRoom.players.forEach(player => {
-          io.to(roomCode).emit(`role-${player.userId}`, {
-            role: player.role,
-            word: player.word
+          // Notify all clients that game has started
+          io.to(roomCode).emit('game-started', {
+            roomCode: gameRoom.roomCode,
+            status: 'in-progress',
+            currentRound: gameRoom.currentRound,
+            currentPhase: gameRoom.currentPhase
           });
-        });
+          
+          // Send private role and word info to each player
+          console.log('Sending role info to players. userSocketMap:', userSocketMap);
+          gameRoom.players.forEach(player => {
+            const socketId = userSocketMap[player.userId.toString()];
+            console.log(`Player ${player.userId} has socket ID ${socketId}, role: ${player.role}, word: ${player.word}`);
+            if (socketId) {
+              io.to(socketId).emit('role-info', {
+                role: player.role,
+                word: player.word
+              });
+            } else {
+              console.error(`No socket ID found for player ${player.userId}`);
+            }
+          });
+        } catch (error) {
+          console.error('Error starting game:', error);
+          socket.emit('error', { message: error.message || 'Failed to start game' });
+        }
       } else {
         socket.emit('error', { message: 'Only the host can start the game' });
       }
@@ -619,9 +631,50 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Handle disconnection
-  socket.on('disconnect', () => {
-    console.log('Client disconnected:', socket.id);
+  // Handle Mr. White word guess
+  socket.on('mr-white-guess', async (data) => {
+    const { gameCode, playerId, word } = data;
+    
+    try {
+      const gameRoom = await GameRoom.findOne({ roomCode: gameCode });
+      if (gameRoom) {
+        // Find the player
+        const player = gameRoom.players.find(p => p.userId.toString() === playerId);
+        
+        if (player && player.role === 'mrwhite') {
+          // Check if the guess is correct (case insensitive)
+          const isCorrect = word.toLowerCase() === gameRoom.words.civilian.toLowerCase();
+          
+          // If correct, Mr. White wins
+          if (isCorrect) {
+            gameRoom.status = 'completed';
+            gameRoom.winner = 'mrwhite';
+            await gameRoom.save();
+            
+            // Notify all players
+            io.to(gameCode).emit('mr-white-guess-result', {
+              playerId,
+              word,
+              isCorrect,
+              correctWord: gameRoom.words.civilian,
+              gameOver: true,
+              winner: 'mrwhite'
+            });
+          } else {
+            // Notify all players of the incorrect guess
+            io.to(gameCode).emit('mr-white-guess-result', {
+              playerId,
+              word,
+              isCorrect,
+              gameOver: false
+            });
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error handling Mr. White guess:', error);
+      socket.emit('error', { message: 'Failed to process guess' });
+    }
   });
 });
 

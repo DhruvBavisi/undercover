@@ -34,9 +34,11 @@ export const loginUser = async (credentials) => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Accept': 'application/json',
       },
       body: JSON.stringify(credentials),
-      credentials: 'include'
+      credentials: 'include',
+      mode: 'cors'
     });
     
     if (!response.ok) {

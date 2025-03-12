@@ -92,7 +92,7 @@ export default function ProfilePage() {
     setFormSuccess('');
     
     try {
-      const result = await updateUserProfile(token, { name, username, avatarId });
+      const result = await updateUserProfile({ name, username, avatarId }, token);
       
       if (result.success) {
         updateProfile(result.user);
@@ -173,7 +173,7 @@ export default function ProfilePage() {
                       <img 
                         src={currentAvatar.image} 
                         alt={currentAvatar.name}
-                        className="w-full h-full object-contain"
+                        className="w-[75%] h-[75%] object-contain absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2"
                       />
                     </div>
                   </div>

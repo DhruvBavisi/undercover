@@ -2,11 +2,13 @@ import React, { useState } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from './ui/card';
-import { Home, RotateCcw, UserPlus } from 'lucide-react';
+import { Home, RotateCcw, UserPlus, Trophy, Users, User } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from './ui/dialog';
 import { Avatar, AvatarImage, AvatarFallback } from './ui/avatar';
 import { useNavigate } from 'react-router-dom';
+import { Badge } from './ui/badge';
+import { cn } from '../lib/utils';
 
 /**
  * @typedef {Object} Player
@@ -48,216 +50,238 @@ export default function OfflineGameOver({
 
   let winnerRole = "Civilians";
   
-  if (remainingCivilians.length <= remainingUndercover.length) {
-    winnerRole = "Undercover";
-  } else if (remainingMrWhite.length > 0) {
+  // If Mr. White guessed correctly, they win
+  if (whiteGuessCorrect) {
     winnerRole = "Mr. White";
-  } else if (eliminatedMrWhite.length > 0 && whiteGuessCorrect) {
+  } 
+  // If undercover agents remain and no civilians, undercover wins
+  else if (remainingCivilians.length === 0 && (remainingUndercover.length > 0 || remainingMrWhite.length > 0)) {
+    winnerRole = "Undercover";
+  }
+  // If Mr. White remains alone, they win
+  else if (remainingCivilians.length === 0 && remainingUndercover.length === 0 && remainingMrWhite.length > 0) {
     winnerRole = "Mr. White";
   }
 
-  // Get avatar for winning role
   const getWinningAvatar = () => {
-    switch(winnerRole) {
-      case "Civilians":
-        return "/avatars/civilian-avatar.png";
-      case "Undercover":
-        return "/avatars/undercover-avatar.png";
-      case "Mr. White":
-        return "/avatars/mrwhite-avatar.png";
-      default:
-        return "/avatars/civilian-avatar.png";
+    if (winnerRole === "Civilians") {
+      const civilian = players.find(p => p.role === "Civilian");
+      return civilian?.avatar || "";
+    } else if (winnerRole === "Undercover") {
+      const undercover = players.find(p => p.role === "Undercover");
+      return undercover?.avatar || "";
+    } else {
+      const mrWhite = players.find(p => p.role === "Mr. White");
+      return mrWhite?.avatar || "";
     }
   };
 
-  // Find the player with the highest score
   const getTopScorer = () => {
-    if (!scores || Object.keys(scores).length === 0) return null;
+    if (!scores) return null;
     
+    let topPlayer = null;
     let topScore = -1;
-    let topScorers = [];
     
-    players.forEach(player => {
-      const playerScore = scores[player.id] || 0;
-      if (playerScore > topScore) {
-        topScore = playerScore;
-        topScorers = [player];
-      } else if (playerScore === topScore) {
-        topScorers.push(player);
+    Object.entries(scores).forEach(([playerId, score]) => {
+      if (score > topScore) {
+        topScore = score;
+        topPlayer = players.find(p => p.id === parseInt(playerId));
       }
     });
     
-    return topScorers.length > 0 ? topScorers[0] : null;
+    return {
+      player: topPlayer,
+      score: topScore
+    };
   };
-  
+
   const topScorer = getTopScorer();
 
   const handleAddPlayers = () => {
-    // Store current players in localStorage for the setup page
-    const currentPlayers = players.map(player => ({
-      name: player.name,
-      role: player.role
-    }));
-    
-    navigate('/offline', { 
-      state: { 
-        players: currentPlayers,
-        fromGame: true
-      } 
-    });
+    setShowAddPlayerDialog(true);
+  };
+
+  const [newPlayerName, setNewPlayerName] = useState("");
+
+  const handleAddNewPlayer = () => {
+    if (newPlayerName.trim()) {
+      onAddPlayer(newPlayerName.trim());
+      setNewPlayerName("");
+      setShowAddPlayerDialog(false);
+    }
   };
 
   const handleQuit = (event) => {
     event.preventDefault();
     onQuit();
-  }
+    navigate('/');
+  };
 
-  const WINNING_POINTS = 5;
+  const getRoleBadgeColor = (role) => {
+    switch (role) {
+      case "Civilian":
+        return "bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-900/50";
+      case "Undercover":
+        return "bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-900/50";
+      case "Mr. White":
+        return "bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-900/50";
+      default:
+        return "";
+    }
+  };
 
   return (
-    <div className="container mx-auto px-4 pt-20 pb-8">
-      <Card className="bg-gray-800/70 border-gray-700 max-w-4xl mx-auto">
-        <CardHeader className="text-center border-b border-gray-700">
-          <div className="flex justify-center items-center mb-4">
-            <div
-              className={`w-20 h-20 rounded-full flex items-center justify-center ${
-                winnerRole === "Civilians" ? "bg-green-500/20" : 
-                winnerRole === "Undercover" ? "bg-red-500/20" : 
-                "bg-purple-500/20"
-              }`}
-            >
-              <Avatar className="h-16 w-16">
-                <AvatarImage src={getWinningAvatar()} alt={winnerRole} />
-                <AvatarFallback className={
-                  winnerRole === "Civilians" ? "bg-green-500/20" : 
-                  winnerRole === "Undercover" ? "bg-red-500/20" : 
-                  "bg-purple-500/20"
-                }>
-                  {winnerRole[0]}
-                </AvatarFallback>
-              </Avatar>
-            </div>
+    <div className="animate-fade-in">
+      <Card className="max-w-4xl mx-auto glass-effect shadow-soft">
+        <CardHeader className="text-center pb-2">
+          <div className="flex justify-center mb-4">
+            {winnerRole === "Civilians" && (
+              <div className="h-16 w-16 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                <Users className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+              </div>
+            )}
+            {winnerRole === "Undercover" && (
+              <div className="h-16 w-16 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                <User className="h-8 w-8 text-red-600 dark:text-red-400" />
+              </div>
+            )}
+            {winnerRole === "Mr. White" && (
+              <div className="h-16 w-16 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
+                <User className="h-8 w-8 text-purple-600 dark:text-purple-400" />
+              </div>
+            )}
           </div>
-
-          <CardTitle className="text-2xl font-bold mb-2">{winnerRole} Win!</CardTitle>
-          
-          {topScorer && (
-            <div className="text-gray-400 text-sm flex items-center justify-center gap-2">
-              Top Player: {topScorer.name} ({scores[topScorer.id] || 0} points)
-            </div>
-          )}
+          <CardTitle className="text-3xl font-bold mb-2">
+            Game Over
+          </CardTitle>
+          <p className="text-xl text-muted-foreground">
+            {winnerRole === "Civilians" && "The Civilians have won!"}
+            {winnerRole === "Undercover" && "The Undercover Agents have won!"}
+            {winnerRole === "Mr. White" && (
+              whiteGuessCorrect 
+                ? "Mr. White guessed the word correctly and won!" 
+                : "Mr. White is the last player standing and won!"
+            )}
+          </p>
         </CardHeader>
-
-        <CardContent className="p-6">
-          <div className="mb-6">
-            <h3 className="text-lg font-semibold mb-3">The Secret Words Were:</h3>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-gray-700/30 p-4 rounded-lg">
-                <div className="text-sm text-gray-400 mb-1">Civilians</div>
-                <div className="text-xl font-semibold">{civilianWord}</div>
-              </div>
-              <div className="bg-gray-700/30 p-4 rounded-lg">
-                <div className="text-sm text-gray-400 mb-1">Undercover</div>
-                <div className="text-xl font-semibold">{undercoverWord}</div>
+        
+        <CardContent className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold flex items-center gap-2">
+                <Trophy className="h-5 w-5 text-primary" />
+                <span>Top Scorer</span>
+              </h3>
+              {topScorer && topScorer.player && (
+                <div className="flex items-center gap-3 p-4 rounded-lg bg-background/50 border">
+                  <Avatar className="h-12 w-12 border-2 border-background">
+                    <AvatarImage src={topScorer.player.avatar} alt={topScorer.player.name} />
+                    <AvatarFallback className="bg-primary/10 text-primary">
+                      {topScorer.player.name.charAt(0).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <p className="font-medium">{topScorer.player.name}</p>
+                    <p className="text-sm text-muted-foreground">Score: {topScorer.score}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold">The Words</h3>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-4 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-900/30">
+                  <p className="text-sm text-blue-600 dark:text-blue-400 font-medium mb-1">Civilian Word</p>
+                  <p className="text-lg font-bold text-blue-700 dark:text-blue-300">{civilianWord}</p>
+                </div>
+                <div className="p-4 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30">
+                  <p className="text-sm text-red-600 dark:text-red-400 font-medium mb-1">Undercover Word</p>
+                  <p className="text-lg font-bold text-red-700 dark:text-red-300">{undercoverWord}</p>
+                </div>
               </div>
             </div>
           </div>
-
-          <div className="mb-4">
-            <h3 className="text-lg font-semibold">Player Roles</h3>
-          </div>
-
-          <div className="bg-gray-700/20 rounded-lg overflow-hidden">
-            <Table className="w-full">
-              <TableHeader className="bg-gray-700/50">
-                <TableRow className="hover:bg-transparent">
-                  <TableHead className="text-gray-300 font-semibold py-3 text-left">Player</TableHead>
-                  <TableHead className="text-gray-300 font-semibold py-3 text-center">Role</TableHead>
-                  <TableHead className="text-gray-300 font-semibold py-3 text-center">Points</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {players.map((player, index) => (
-                  <TableRow
-                    key={player.id}
-                    className={`${index % 2 === 0 ? 'bg-gray-700/10' : 'bg-gray-700/20'} hover:bg-gray-700/30 transition-colors border-b border-gray-700/50 ${player.isEliminated ? 'opacity-60' : ''}`}
-                  >
-                    <TableCell className="flex items-center gap-2 py-3">
-                      <Avatar className="h-8 w-8">
-                        <AvatarImage src={player.avatar} alt={player.role} />
-                        <AvatarFallback className={player.role === "Civilian" ? "bg-green-500/20" : player.role === "Undercover" ? "bg-red-500/20" : "bg-purple-500/20"}>
-                          {player.name[0]}
-                        </AvatarFallback>
-                      </Avatar>
-                      <span>{player.name}</span>
-                    </TableCell>
-                    <TableCell className="text-center py-3">
-                      <span className={player.role === "Civilian" ? "text-green-500" : player.role === "Undercover" ? "text-red-500" : "text-purple-500"}>
-                        {player.role}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-center py-3">{scores[player.id] || 0}</TableCell>
+          
+          <div>
+            <h3 className="text-lg font-semibold mb-3">Player Results</h3>
+            <div className="overflow-hidden rounded-lg border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Player</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead>Word</TableHead>
+                    <TableHead className="text-right">Score</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {players.map((player) => (
+                    <TableRow key={player.id} className={player.isEliminated ? "opacity-60" : ""}>
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-2">
+                          <Avatar className="h-8 w-8">
+                            <AvatarImage src={player.avatar} alt={player.name} />
+                            <AvatarFallback className="bg-primary/10 text-primary text-xs">
+                              {player.name.charAt(0).toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span>{player.name}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className={cn(getRoleBadgeColor(player.role))}>
+                          {player.role}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>{player.word || (player.role === "Mr. White" ? "Unknown" : "")}</TableCell>
+                      <TableCell className="text-right">{scores?.[player.id] || 0}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           </div>
         </CardContent>
-
-        <CardFooter className="flex flex-col sm:flex-row gap-4 p-6">
-          <Button className="!bg-green-600 hover:!bg-green-700 w-full sm:w-auto" onClick={onRestart}>
-            <RotateCcw className="mr-2 h-4 w-4" />
+        
+        <CardFooter className="flex flex-wrap gap-3 justify-center pt-2">
+          <Button onClick={onRestart} className="flex items-center gap-2">
+            <RotateCcw className="h-4 w-4" />
             Play Again
           </Button>
-          <Button 
-            className="!bg-white !text-black hover:!bg-gray-300 !important !w-full sm:w-auto" 
-            onClick={() => setShowAddPlayerDialog(true)}
-          >
-            <UserPlus className="mr-2 h-4 w-4" />
+          <Button variant="outline" onClick={handleAddPlayers} className="flex items-center gap-2">
+            <UserPlus className="h-4 w-4" />
             Add Player
           </Button>
-          <Button className="!bg-red-600 hover:!bg-red-700 w-full sm:w-auto" onClick={handleQuit}>
-            <Home className="mr-2 h-4 w-4" />
-            Quit
+          <Button variant="ghost" onClick={handleQuit} className="flex items-center gap-2">
+            <Home className="h-4 w-4" />
+            Return Home
           </Button>
         </CardFooter>
       </Card>
 
-      {/* Add Player Confirmation Dialog */}
       <Dialog open={showAddPlayerDialog} onOpenChange={setShowAddPlayerDialog}>
-        <DialogContent className="bg-gray-800 text-white border-gray-700">
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Add New Players</DialogTitle>
-            <DialogDescription className="text-gray-400">
-              This will take you to the game setup page with your current players. You can add more players there.
+            <DialogTitle>Add New Player</DialogTitle>
+            <DialogDescription>
+              Enter the name of the player you want to add to the game.
             </DialogDescription>
           </DialogHeader>
-          <div className="flex flex-col gap-4">
-            <div className="text-sm text-gray-300">
-              Current Players: {players.length}
-            </div>
-            <div className="text-sm text-gray-300">
-              You'll be able to:
-              <ul className="list-disc list-inside mt-2 space-y-1">
-                <li>Add new players</li>
-                <li>Adjust game settings</li>
-                <li>Start a new game with more players</li>
-              </ul>
-            </div>
+          <div className="space-y-4 py-4">
+            <Input
+              placeholder="Player name"
+              value={newPlayerName}
+              onChange={(e) => setNewPlayerName(e.target.value)}
+              className="w-full"
+            />
           </div>
-          <DialogFooter className="flex gap-2 sm:gap-0">
-            <Button
-              variant="ghost"
-              onClick={() => setShowAddPlayerDialog(false)}
-              className="border border-gray-600"
-            >
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddPlayerDialog(false)}>
               Cancel
             </Button>
-            <Button
-              onClick={handleAddPlayers}
-              className="bg-purple-600 hover:bg-purple-700"
-            >
-              Continue to Setup
+            <Button onClick={handleAddNewPlayer}>
+              Add Player
             </Button>
           </DialogFooter>
         </DialogContent>

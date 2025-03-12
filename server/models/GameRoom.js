@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { getRandomWordPair } from '../utils/wordPacks.js';
 
 const gameRoomSchema = new mongoose.Schema({
   roomCode: {
@@ -52,28 +53,24 @@ const gameRoomSchema = new mongoose.Schema({
   settings: {
     maxPlayers: {
       type: Number,
-      default: 8,
       min: 3,
-      max: 12
+      max: 20
     },
     roundTime: {
       type: Number,
-      default: 60, // seconds
       min: 30,
       max: 180
     },
     wordPack: {
-      type: String,
-      default: 'basic'
+      type: String
     },
     numUndercovers: {
       type: Number,
-      default: 1,
       min: 1
     },
-    includeMrWhite: {
-      type: Boolean,
-      default: false
+    numMrWhites: {
+      type: Number,
+      min: 0
     },
     customWords: {
       civilian: String,
@@ -177,7 +174,7 @@ gameRoomSchema.methods.removePlayer = function(userId) {
 
 // Update the startGame method to handle Mr. White
 gameRoomSchema.methods.startGame = function() {
-  if (this.players.length < 4) {
+  if (this.players.length < 3) {
     throw new Error('Not enough players to start the game');
   }
 
@@ -190,11 +187,18 @@ gameRoomSchema.methods.startGame = function() {
   this.winner = '';
 
   // Get word pair based on settings
-  let { civilian, undercover } = this.settings.customWords && 
-    this.settings.customWords.civilian && 
-    this.settings.customWords.undercover
-      ? this.settings.customWords
-      : getRandomWordPair(this.settings.wordPack);
+  let civilian, undercover;
+  
+  if (this.settings.customWords && 
+      this.settings.customWords.civilian && 
+      this.settings.customWords.undercover) {
+    civilian = this.settings.customWords.civilian;
+    undercover = this.settings.customWords.undercover;
+  } else {
+    const wordPair = getRandomWordPair(this.settings.wordPack);
+    civilian = wordPair[0];
+    undercover = wordPair[1];
+  }
 
   this.words = { civilian, undercover };
 
@@ -207,25 +211,35 @@ gameRoomSchema.methods.startGame = function() {
     Math.floor(this.players.length / 3)
   );
 
-  // Determine if Mr. White should be included
-  const includeMrWhite = this.settings.includeMrWhite && this.players.length >= 5;
+  // Get number of Mr. Whites from settings
+  const numMrWhites = Math.min(
+    this.settings.numMrWhites || 0,
+    Math.floor(this.players.length / 5)  // Limit Mr. Whites to 20% of players
+  );
   
   // Assign roles
-  shuffledPlayers.forEach((player, index) => {
-    if (includeMrWhite && index === 0) {
-      // First player is Mr. White if enabled
+  let assignedUndercovers = 0;
+  let assignedMrWhites = 0;
+  
+  shuffledPlayers.forEach((player) => {
+    // Reset player state
+    player.isEliminated = false;
+    
+    if (assignedMrWhites < numMrWhites) {
+      // Assign Mr. White roles first
       player.role = 'mrwhite';
       player.word = '';
-    } else if (index < numUndercovers + (includeMrWhite ? 1 : 0)) {
-      // Next N players are undercovers
+      assignedMrWhites++;
+    } else if (assignedUndercovers < numUndercovers) {
+      // Next assign undercover roles
       player.role = 'undercover';
       player.word = undercover;
+      assignedUndercovers++;
     } else {
       // Remaining players are civilians
       player.role = 'civilian';
       player.word = civilian;
     }
-    player.isEliminated = false;
   });
 
   // Update players array with new roles
@@ -248,21 +262,30 @@ gameRoomSchema.methods.checkWinCondition = function() {
   const alivePlayers = this.players.filter(p => !p.isEliminated);
   const aliveCivilians = alivePlayers.filter(p => p.role === 'civilian');
   const aliveUndercovers = alivePlayers.filter(p => p.role === 'undercover');
-  const aliveMrWhite = alivePlayers.find(p => p.role === 'mrwhite');
-
-  // Civilians win if all undercovers and Mr. White are eliminated
-  if (aliveUndercovers.length === 0 && !aliveMrWhite) {
+  const aliveMrWhites = alivePlayers.filter(p => p.role === 'mrwhite');
+  
+  // Civilians win if all undercovers and Mr. Whites are eliminated
+  if (aliveUndercovers.length === 0 && aliveMrWhites.length === 0) {
+    this.status = 'completed';
+    this.winner = 'civilians';
     return 'civilians';
   }
-
+  
   // Undercovers win if number of undercovers equals or exceeds civilians
   if (aliveUndercovers.length >= aliveCivilians.length) {
+    this.status = 'completed';
+    this.winner = 'undercovers';
     return 'undercovers';
   }
-
-  // Mr. White wins if they correctly guess the word
-  // This is handled separately through a socket event
-
+  
+  // Mr. White wins if they're the only one left
+  if (aliveMrWhites.length === 1 && aliveCivilians.length === 0 && aliveUndercovers.length === 0) {
+    this.status = 'completed';
+    this.winner = 'mrwhite';
+    return 'mrwhite';
+  }
+  
+  // Game continues
   return null;
 };
 

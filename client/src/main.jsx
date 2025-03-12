@@ -24,7 +24,7 @@ import OnlineGamePage from './pages/OnlineGamePage.jsx';
 // Create a wrapper component that includes all providers except RouterProvider
 const AppProviders = ({ children }) => {
   return (
-    <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
+    <ThemeProvider defaultTheme="system" storageKey="code-undercover-theme">
       <AuthProvider>
         <SocketProvider>
           {children}

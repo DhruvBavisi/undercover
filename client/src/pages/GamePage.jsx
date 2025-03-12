@@ -211,196 +211,161 @@ export default function GamePage() {
   if (room) {
     // Game is in waiting state
     if (room.status === 'waiting') {
-  return (
+      return (
         <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 text-white p-4">
-          <div className="container mx-auto max-w-md">
-            <div className="flex justify-between items-center mb-8">
+          <div className="container mx-auto max-w-2xl">
+            {/* Header */}
+            <div className="flex items-center justify-between mb-8">
               <Button 
                 variant="ghost" 
-                className="text-gray-400 hover:text-white p-0"
+                className="text-gray-400 hover:text-white"
                 onClick={handleLeaveGame}
               >
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Leave Game
               </Button>
               
-              <div className="flex items-center">
-                <span className="text-xl font-mono font-bold">{gameCode}</span>
-                <Button 
-                  size="icon" 
-                  variant="ghost" 
-                  onClick={copyGameCode}
-                  className="ml-2 text-gray-400 hover:text-white"
-                >
-                  <Copy className="h-4 w-4" />
-                </Button>
+              <div className="flex items-center space-x-2">
+                <span className="text-lg font-semibold text-gray-300">Room Code:</span>
+                <div className="flex items-center bg-gray-700 rounded-lg px-3 py-1">
+                  <span className="text-lg font-mono mr-2">{gameCode}</span>
+                  <button
+                    onClick={copyGameCode}
+                    className="text-gray-400 hover:text-white transition-colors"
+                  >
+                    <Copy className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
             </div>
-            
-            <Card className="bg-gray-800 border-gray-700 mb-6">
-              <CardContent className="p-6">
-                <h2 className="text-xl font-bold mb-4">Waiting for Players</h2>
-                
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center">
-                    <Users className="h-5 w-5 mr-2 text-blue-400" />
-                    <span>{room.players.length}/{room.settings.maxPlayers} Players</span>
-                  </div>
-                  
-                  {isHost() && (
-                    <div>
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <div>
-                              <Button 
-                                onClick={handleStartGame}
-                                disabled={room.players.length < 3 || !room.players.every(p => p.isReady) || isRedirecting}
-                                className="bg-green-600 hover:bg-green-700 px-6 py-2 font-bold"
-                                size="lg"
-                              >
-                                {isRedirecting ? (
-                                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Starting...</>
-                                ) : room.players.length < 3 ? (
-                                  <>Need {3 - room.players.length} More</>
-                                ) : !room.players.every(p => p.isReady) ? (
-                                  <>Waiting for Ready</>
-                                ) : (
-                                  <>Start Game</>
-                                )}
-                              </Button>
-                            </div>
-                          </TooltipTrigger>
-                          <TooltipContent className="bg-gray-800 border-gray-700 p-3 max-w-xs">
-                            <p>
-                              {room.players.length < 3 ? (
-                                <>You need at least 3 players to start the game.</>
-                              ) : !room.players.every(p => p.isReady) ? (
-                                <>All players must be ready before you can start the game.</>
-                              ) : (
-                                <>You're ready to start! Click to begin the game.</>
-                              )}
-                            </p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                      
-                      {/* Fallback button for direct navigation */}
-                      <div className="mt-2 text-center">
-                        <Button
-                          variant="link"
-                          className="text-xs text-gray-400 hover:text-white"
-                          onClick={() => {
-                            setIsRedirecting(true);
-                            navigate(`/online-game/${gameCode}`);
-                          }}
-                        >
-                          Having trouble? Click here to go to game page directly
-                        </Button>
-                      </div>
+
+            {/* Main Content */}
+            <Card className="bg-gray-800 border-gray-700">
+              <CardHeader>
+                <CardTitle className="text-2xl font-bold text-center">Waiting Room</CardTitle>
+                <CardDescription className="text-center text-gray-400">
+                  {loading ? (
+                    <div className="flex items-center justify-center">
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      Updating...
+                    </div>
+                  ) : room.players.length < 3 ? (
+                    <div className="flex flex-col items-center space-y-1">
+                      <span>Need {3 - room.players.length} more {3 - room.players.length === 1 ? 'player' : 'players'}</span>
+                      <span className="text-sm text-gray-500">Minimum 3 players required</span>
+                    </div>
+                  ) : !room.players.every(p => p.isReady) ? (
+                    <div className="flex flex-col items-center space-y-1">
+                      <span>Waiting for players to be ready</span>
+                      <span className="text-sm text-gray-500">
+                        {room.players.filter(p => p.isReady).length} of {room.players.length} ready
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center space-y-1">
+                      <span className="text-green-400">All players ready!</span>
+                      <span className="text-sm text-gray-500">Game can be started</span>
                     </div>
                   )}
+                </CardDescription>
+              </CardHeader>
+
+              <CardContent className="space-y-6">
+                {/* Player Count */}
+                <div className="flex items-center justify-center bg-gray-700/50 rounded-lg p-4">
+                  <Users className="h-5 w-5 mr-2 text-blue-400" />
+                  <div className="flex flex-col items-center">
+                    <span className="text-lg">
+                      {room.players.length}/{room.settings.maxPlayers} Players
+                    </span>
+                    {room.players.length > 0 && (
+                      <span className="text-sm text-gray-400">
+                        {room.players.filter(p => p.isReady).length} ready
+                      </span>
+                    )}
+                  </div>
                 </div>
-                
-                <div className="space-y-2">
-                  {room.players.map((player) => (
+
+                {/* Players List */}
+                <div className="space-y-3">
+                  {room.players.map(player => (
                     <div 
-                      key={player.userId} 
-                      className={`flex items-center justify-between p-3 rounded-lg ${
-                        player.isReady ? 'bg-green-900/30' : 'bg-gray-700/30'
-                      }`}
+                      key={player.userId}
+                      className="flex items-center justify-between bg-gray-700/30 rounded-lg p-4"
                     >
                       <div className="flex items-center">
-                        <div className="h-8 w-8 rounded-full bg-blue-600 flex items-center justify-center mr-3">
-                          {player.name.charAt(0).toUpperCase()}
+                        <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center mr-3">
+                          <span className="text-white font-bold">
+                            {player.name.charAt(0).toUpperCase()}
+                          </span>
                         </div>
                         <div>
-                          <p className="font-medium">{player.name}</p>
-                          <p className="text-xs text-gray-400">@{player.username}</p>
+                          <p className="font-medium text-white">{player.name}</p>
+                          <p className="text-sm text-gray-400">@{player.username}</p>
                         </div>
                       </div>
-                      
-                      <div className="flex items-center">
+                      <div className="flex items-center space-x-2">
                         {player.userId === room.hostId && (
-                          <span className="text-xs bg-purple-600 px-2 py-1 rounded mr-2">Host</span>
+                          <span className="bg-purple-600 text-white text-xs px-2 py-1 rounded">
+                            Host
+                          </span>
                         )}
-                        <span className={`text-xs px-2 py-1 rounded ${
-                          player.isReady ? 'bg-green-600' : 'bg-gray-600'
-                        }`}>
-                          {player.isReady ? 'Ready' : 'Not Ready'}
-                        </span>
-                        
-                        {/* Remove player button (host only) */}
-                        {isHost() && player.userId !== user.id && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="ml-2 text-red-400 hover:text-red-300 hover:bg-red-900/20"
-                            onClick={() => {
-                              if (confirm(`Are you sure you want to remove ${player.name} from the game?`)) {
-                                // Call API to remove player
-                                fetch(`${API_URL}/api/game-rooms/rooms/${room.roomCode}/remove-player`, {
-                                  method: 'POST',
-                                  headers: {
-                                    'Content-Type': 'application/json',
-                                    'Authorization': `Bearer ${token}`
-                                  },
-                                  body: JSON.stringify({ playerId: player.userId })
-                                })
-                                .then(response => response.json())
-                                .then(data => {
-                                  if (data.success) {
-                                    toast({
-                                      title: "Player Removed",
-                                      description: `${player.name} has been removed from the game.`,
-                                      variant: "default"
-                                    });
-                                  } else {
-                                    toast({
-                                      title: "Error",
-                                      description: data.message || "Failed to remove player",
-                                      variant: "destructive"
-                                    });
-                                  }
-                                })
-                                .catch(err => {
-                                  console.error('Error removing player:', err);
-                                  toast({
-                                    title: "Error",
-                                    description: "Failed to remove player",
-                                    variant: "destructive"
-                                  });
-                                });
-                              }
-                            }}
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
+                        {player.isReady && (
+                          <span className="bg-green-600 text-white text-xs px-2 py-1 rounded">
+                            Ready
+                          </span>
                         )}
                       </div>
                     </div>
                   ))}
                 </div>
+
+                {/* Action Buttons */}
+                <div className="flex flex-col space-y-4">
+                  {!isHost() ? (
+                    <Button
+                      onClick={toggleReady}
+                      className={`w-full py-4 text-lg font-medium ${
+                        isPlayerReady()
+                          ? 'bg-red-600 hover:bg-red-700'
+                          : 'bg-green-600 hover:bg-green-700'
+                      }`}
+                      disabled={loading}
+                    >
+                      {loading ? (
+                        <Loader2 className="h-5 w-5 animate-spin mx-auto" />
+                      ) : isPlayerReady() ? (
+                        'Not Ready'
+                      ) : (
+                        'Ready'
+                      )}
+                    </Button>
+                  ) : (
+                    <Button
+                      onClick={handleStartGame}
+                      className="w-full py-4 text-lg font-medium bg-blue-600 hover:bg-blue-700"
+                      disabled={
+                        room.players.length < 3 ||
+                        !room.players.every(p => p.isReady) ||
+                        isRedirecting
+                      }
+                    >
+                      {isRedirecting ? (
+                        <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Starting...</>
+                      ) : room.players.length < 3 ? (
+                        `Need ${3 - room.players.length} More Players`
+                      ) : !room.players.every(p => p.isReady) ? (
+                        'Waiting for Players to be Ready'
+                      ) : (
+                        'Start Game'
+                      )}
+                    </Button>
+                  )}
+                </div>
               </CardContent>
             </Card>
-            
-            <Button 
-              onClick={toggleReady}
-              disabled={isRedirecting}
-              className={`w-full ${
-                isPlayerReady() ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'
-              }`}
-            >
-              {isRedirecting ? (
-                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Please wait...</>
-              ) : isPlayerReady() ? (
-                'Not Ready'
-              ) : (
-                'Ready'
-              )}
-            </Button>
           </div>
-                </div>
+        </div>
       );
     }
     
