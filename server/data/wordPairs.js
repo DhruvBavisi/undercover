@@ -100,4 +100,4 @@ const wordPairs = [
   { civilian: 'Robot', undercover: 'AI', category: 'Technology' }
 ];
 
-export default wordPair()
+export default wordPairs;
