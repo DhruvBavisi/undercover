@@ -99,3 +99,5 @@ const wordPairs = [
   { civilian: 'Camera', undercover: 'Camcorder', category: 'Technology' },
   { civilian: 'Robot', undercover: 'AI', category: 'Technology' }
 ];
+
+export default wordPair()
