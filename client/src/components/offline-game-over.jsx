@@ -2,13 +2,14 @@ import React, { useState } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from './ui/card';
-import { Home, RotateCcw, UserPlus, Trophy, Users, User } from 'lucide-react';
+import { Home, RotateCcw, UserPlus, Trophy, Users, User, Pause } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from './ui/dialog';
 import { Avatar, AvatarImage, AvatarFallback } from './ui/avatar';
 import { useNavigate } from 'react-router-dom';
 import { Badge } from './ui/badge';
 import { cn } from '../lib/utils';
+import PauseMenu from "./pause-menu";
 
 /**
  * @typedef {Object} Player
@@ -40,6 +41,7 @@ export default function OfflineGameOver({
   onQuit,
 }) {
   const [showAddPlayerDialog, setShowAddPlayerDialog] = useState(false);
+  const [showPauseMenu, setShowPauseMenu] = useState(false);
   const navigate = useNavigate();
 
   // Determine the winning team based on remaining players and Mr. White guess
@@ -132,6 +134,17 @@ export default function OfflineGameOver({
 
   return (
     <div className="animate-fade-in">
+      <div className="max-w-4xl mx-auto mb-4 flex justify-end">
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={() => setShowPauseMenu(true)}
+          className="h-8 w-8"
+        >
+          <Pause className="h-4 w-4" />
+        </Button>
+      </div>
+
       <Card className="max-w-4xl mx-auto glass-effect shadow-soft">
         <CardHeader className="text-center pb-2">
           <div className="flex justify-center mb-4">
@@ -245,20 +258,46 @@ export default function OfflineGameOver({
         </CardContent>
         
         <CardFooter className="flex flex-wrap gap-3 justify-center pt-2">
-          <Button onClick={onRestart} className="flex items-center gap-2">
+          <Button onClick={onRestart} className="flex items-center gap-2 !bg-blue-600 hover:!bg-blue-700">
             <RotateCcw className="h-4 w-4" />
             Play Again
           </Button>
-          <Button variant="outline" onClick={handleAddPlayers} className="flex items-center gap-2">
+          <Button 
+            variant="outline" 
+            onClick={handleAddPlayers} 
+            className="flex items-center gap-2 !bg-blue-600 hover:!bg-blue-700 text-white"
+          >
             <UserPlus className="h-4 w-4" />
             Add Player
           </Button>
-          <Button variant="ghost" onClick={handleQuit} className="flex items-center gap-2">
+          <Button 
+            variant="ghost" 
+            onClick={handleQuit} 
+            className="flex items-center gap-2 !bg-red-600 hover:!bg-red-700 text-white"
+          >
             <Home className="h-4 w-4" />
             Return Home
           </Button>
         </CardFooter>
       </Card>
+
+      <PauseMenu
+        isOpen={showPauseMenu}
+        onClose={() => setShowPauseMenu(false)}
+        onResume={() => setShowPauseMenu(false)}
+        onRestart={onRestart}
+        onAddPlayer={() => {
+          setShowPauseMenu(false);
+          // Navigate to setup page with current players
+          navigate('/offline', { 
+            state: { 
+              players: players,
+              fromGame: true
+            } 
+          });
+        }}
+        title="Game Over Menu"
+      />
 
       <Dialog open={showAddPlayerDialog} onOpenChange={setShowAddPlayerDialog}>
         <DialogContent className="sm:max-w-md">

@@ -274,9 +274,18 @@ export default function OfflineGamePage() {
 
   const confirmAddPlayer = () => {
     // Store current players in localStorage to preserve them
-    const currentPlayerNames = players.map(p => p.name);
-    localStorage.setItem('offlineGamePlayers', JSON.stringify(currentPlayerNames));
-    navigate('/offline/setup');
+    const currentPlayers = players.map(player => ({
+      name: player.name,
+      id: player.id
+    }));
+    
+    // Navigate to setup with current players
+    navigate('/offline', { 
+      state: { 
+        players: currentPlayers,
+        fromGame: true
+      } 
+    });
   };
 
   const cancelAddPlayer = () => {
@@ -360,27 +369,27 @@ export default function OfflineGamePage() {
       <div className="relative z-10">
         {renderGamePhase()}
       </div>
-      <div className="absolute top-4 right-4 flex items-center gap-4">
-        <Badge variant="outline" className="text-lg py-1 px-3">
+      <div className="absolute top-4 right-4 flex items-center gap-4 z-50">
+        <Badge variant="outline" className="text-lg py-1 px-3 bg-gray-800/70">
           Round {round}
         </Badge>
         <Button
           variant="outline"
           size="icon"
-          className="h-9 w-9"
+          className="h-9 w-9 bg-gray-800/70"
           onClick={() => setIsPaused(true)}
         >
           <Pause className="h-4 w-4" />
         </Button>
       </div>
-      {isPaused && (
-        <PauseMenu
-          onResume={() => setIsPaused(false)}
-          onRestart={handleRestart}
-          onQuit={handleQuit}
-          onAddPlayer={handleAddPlayer}
-        />
-      )}
+      <PauseMenu
+        isOpen={isPaused}
+        onClose={() => setIsPaused(false)}
+        onResume={() => setIsPaused(false)}
+        onRestart={handleRestart}
+        onAddPlayer={handleAddPlayer}
+        title="Game Paused"
+      />
       <Dialog open={showQuitConfirm} onOpenChange={setShowQuitConfirm}>
         <DialogContent className="bg-gray-800 text-white">
           <DialogHeader>

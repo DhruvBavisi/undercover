@@ -6,7 +6,7 @@ import './index.css';
 import HomePage from './pages/HomePage.jsx';
 import CreateGamePage from './pages/CreateGamePage.jsx';
 import JoinGamePage from './pages/JoinGamePage.jsx';
-import GamePage from './pages/GamePage.jsx';
+import WaitingRoomPage from './pages/WaitingRoomPage.jsx';
 import HowToPlayPage from './pages/HowToPlayPage.jsx';
 import OfflinePage from './pages/OfflinePage.jsx';
 import OfflineGamePage from './pages/OfflineGamePage.jsx';
@@ -68,7 +68,7 @@ const router = createBrowserRouter([
         path: 'game/:gameCode', 
         element: (
           <GameRoomProvider>
-            <GamePage />
+            <WaitingRoomPage />
           </GameRoomProvider>
         )
       },

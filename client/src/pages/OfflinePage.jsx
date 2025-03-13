@@ -5,7 +5,7 @@ import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Slider } from "../components/ui/slider";
-import { ArrowLeft, Plus, Minus, User } from "lucide-react";
+import { ArrowLeft, Plus, Minus, User, Pause } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -21,6 +21,15 @@ import {
   CardTitle,
 } from "../components/ui/card";
 import { useToast } from "../hooks/use-toast"; // Import toast
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "../components/ui/dialog";
+import PauseMenu from "../components/pause-menu";
 
 export default function OfflinePage() {
   const navigate = useNavigate();
@@ -149,10 +158,12 @@ export default function OfflinePage() {
       try {
         // Get player data from either source
         let playerData;
+        let settings;
+        
         if (initialPlayers.length > 0) {
           playerData = initialPlayers;
         } else {
-          const settings = JSON.parse(storedSettings);
+          settings = JSON.parse(storedSettings);
           playerData = settings.existingPlayers || [];
         }
 
@@ -162,6 +173,15 @@ export default function OfflinePage() {
           setPlayers(playerNames);
           setPlayerCount(playerNames.length);
           setNameErrors(Array(playerNames.length).fill(""));
+          
+          // Load other settings if available
+          if (settings) {
+            if (settings.includeWhite !== undefined) setIncludeWhite(settings.includeWhite);
+            if (settings.undercoverCount !== undefined) setUndercoverCount(settings.undercoverCount);
+            if (settings.mrWhiteCount !== undefined) setMrWhiteCount(settings.mrWhiteCount);
+            if (settings.wordCategory) setWordCategory(settings.wordCategory);
+            if (settings.rounds) setRounds(settings.rounds);
+          }
           
           // Apply recommended roles
           applyRecommendedRoles(playerNames.length);
@@ -434,20 +454,37 @@ export default function OfflinePage() {
     return playerCount - undercoverCount - (includeWhite ? mrWhiteCount : 0);
   };
 
+  const [showPauseMenu, setShowPauseMenu] = useState(false);
+
+  // Add pause menu handlers
+  const handlePauseGame = () => {
+    setShowPauseMenu(true);
+  };
+
+  const handleResume = () => {
+    setShowPauseMenu(false);
+  };
+
+  const handleQuit = () => {
+    navigate('/');
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 text-white">
       <div className="container mx-auto px-4 py-12">
-        <Link to="/" className="text-blue-400 hover:text-blue-300 mb-8 inline-flex items-center">
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back to Home
-        </Link>
-        
         <div className="flex justify-between items-center mb-8">
-          {fromGame && (
-            <div className="text-sm text-gray-400">
-              Adding players to existing game
-            </div>
-          )}
+          <Link to="/" className="text-blue-400 hover:text-blue-300 inline-flex items-center">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Home
+          </Link>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={handlePauseGame}
+            className="h-8 w-8"
+          >
+            <Pause className="h-4 w-4" />
+          </Button>
         </div>
 
         <div className="max-w-md mx-auto">
@@ -664,6 +701,28 @@ export default function OfflinePage() {
           </Card>
         </div>
       </div>
+
+      {/* Replace the existing Pause Menu Dialog with the new component */}
+      <PauseMenu
+        isOpen={showPauseMenu}
+        onClose={() => setShowPauseMenu(false)}
+        onResume={handleResume}
+        onRestart={handleStartGame}
+        onAddPlayer={() => {
+          setShowPauseMenu(false);
+          // Navigate to setup page with current players
+          navigate('/offline', { 
+            state: { 
+              players: players.map((name, index) => ({
+                name,
+                id: index + 1
+              })),
+              fromGame: true
+            } 
+          });
+        }}
+        title="Game Setup Paused"
+      />
     </div>
   );
 }

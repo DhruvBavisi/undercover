@@ -12,6 +12,7 @@ import {
   updateSettings
 } from '../services/gameRoom';
 import { API_URL } from '../config';
+import { toast } from 'sonner';
 
 // Create context
 const GameRoomContext = createContext();
@@ -43,6 +44,14 @@ export const GameRoomProvider = ({ children }) => {
   const [error, setError] = useState(null);
   const [playerRole, setPlayerRole] = useState(null);
   const [playerWord, setPlayerWord] = useState(null);
+  const [gamePhase, setGamePhase] = useState('waiting'); // waiting, description, discussion, voting, elimination, gameOver
+  const [currentRound, setCurrentRound] = useState(1);
+  const [usedWords, setUsedWords] = useState(new Set());
+  const [votes, setVotes] = useState({});
+  const [eliminatedPlayer, setEliminatedPlayer] = useState(null);
+  const [winner, setWinner] = useState(null);
+  const [scores, setScores] = useState({});
+  const [readyPlayers, setReadyPlayers] = useState(new Set());
   
   // Refs for debouncing and preventing race conditions
   const updateTimeoutRef = useRef(null);
@@ -102,6 +111,20 @@ export const GameRoomProvider = ({ children }) => {
         // Use debounced update for less critical changes
         debouncedSetRoom(updatedRoom);
       }
+    };
+    
+    // Listen for player ready status updates
+    const handlePlayerReady = (data) => {
+      console.log('Player ready status updated:', data);
+      setReadyPlayers(prev => {
+        const newSet = new Set(prev);
+        if (data.isReady) {
+          newSet.add(data.userId);
+        } else {
+          newSet.delete(data.userId);
+        }
+        return newSet;
+      });
     };
     
     // Listen for game start
@@ -175,6 +198,7 @@ export const GameRoomProvider = ({ children }) => {
     socket.on(`role-${user?.id}`, handleRoleAssignment);
     socket.on('role-info', handleRoleAssignment);
     socket.on('error', handleError);
+    socket.on('player-ready-update', handlePlayerReady);
     
     // Clean up event listeners
     return () => {
@@ -185,6 +209,7 @@ export const GameRoomProvider = ({ children }) => {
       socket.off(`role-${user?.id}`, handleRoleAssignment);
       socket.off('role-info', handleRoleAssignment);
       socket.off('error', handleError);
+      socket.off('player-ready-update', handlePlayerReady);
     };
   }, [socket, room?.roomCode, user?.id, navigate, debouncedSetRoom]);
   
@@ -311,6 +336,17 @@ export const GameRoomProvider = ({ children }) => {
     try {
       console.log(`Setting ready status to ${isReady} for room ${room.roomCode}`);
       
+      // Update ready players set locally first for immediate feedback
+      setReadyPlayers(prev => {
+        const newSet = new Set(prev);
+        if (isReady) {
+          newSet.add(user.id);
+        } else {
+          newSet.delete(user.id);
+        }
+        return newSet;
+      });
+      
       // Emit socket event for real-time updates to other players
       socket.emit('player-ready', {
         roomCode: room.roomCode,
@@ -324,13 +360,41 @@ export const GameRoomProvider = ({ children }) => {
       if (response.success) {
         console.log('Ready status updated successfully:', response.room);
         debouncedSetRoom(response.room);
+        
+        // Update ready players set based on server response
+        const readyPlayerIds = response.room.players
+          .filter(player => player.isReady)
+          .map(player => player.userId);
+        setReadyPlayers(new Set(readyPlayerIds));
       } else {
         console.error('Failed to update ready status:', response.message);
         setError(response.message || 'Failed to update ready status');
+        
+        // Revert ready players set on failure
+        setReadyPlayers(prev => {
+          const newSet = new Set(prev);
+          if (isReady) {
+            newSet.delete(user.id);
+          } else {
+            newSet.add(user.id);
+          }
+          return newSet;
+        });
       }
     } catch (err) {
       console.error('Error updating ready status:', err);
       setError('An error occurred while updating ready status');
+      
+      // Revert ready players set on error
+      setReadyPlayers(prev => {
+        const newSet = new Set(prev);
+        if (isReady) {
+          newSet.delete(user.id);
+        } else {
+          newSet.add(user.id);
+        }
+        return newSet;
+      });
     } finally {
       setLoading(false);
     }
@@ -388,43 +452,63 @@ export const GameRoomProvider = ({ children }) => {
     }
   };
   
-  // Start the game (host only)
-  const startGame = () => {
-    console.log('startGame called, room:', room?.roomCode, 'socket connected:', !!socket);
-    
-    if (!room || !socket) {
-      console.error('Cannot start game: room or socket is missing', { 
-        roomExists: !!room, 
-        socketExists: !!socket 
-      });
-      return;
-    }
-    
-    console.log('Emitting start-game event with data:', { 
-      roomCode: room.roomCode, 
-      userId: user?.id 
-    });
-    
-    // Set a flag to indicate we're trying to start the game
-    isRedirectingRef.current = true;
-    
-    socket.emit('start-game', { 
-      roomCode: room.roomCode, 
-      userId: user?.id 
-    });
-    
-    // If we don't get a response within 3 seconds, reset the flag
-    setTimeout(() => {
-      if (isRedirectingRef.current) {
-        isRedirectingRef.current = false;
-      }
-    }, 3000);
-  };
-  
   // Check if the current user is the host
   const isHost = () => {
     return room && user && room.hostId === user.id;
   };
+  
+  // Start the game
+  const startGame = useCallback(async () => {
+    if (!room || !isHost()) return;
+    
+    setLoading(true);
+    try {
+      const response = await fetch(`${API_URL}/game-rooms/rooms/${room.roomCode}/start`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      const data = await response.json();
+      if (data.success) {
+        // Update room status locally
+        setRoom(prevRoom => ({
+          ...prevRoom,
+          status: 'in-progress'
+        }));
+        
+        // Emit game start event
+        if (socket) {
+          socket.emit('game-start', {
+            gameCode: room.roomCode
+          });
+        }
+        
+        // Set game phase to description
+        setGamePhase('description');
+        
+        // Navigate to online game
+        navigate(`/online-game/${room.roomCode}`);
+      } else {
+        toast({
+          title: "Error",
+          description: data.message || "Failed to start game",
+          variant: "destructive"
+        });
+      }
+    } catch (err) {
+      console.error('Error starting game:', err);
+      toast({
+        title: "Error",
+        description: "Failed to start game",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [room, isHost, token, socket, navigate]);
   
   // Check if the current user is ready
   const isPlayerReady = () => {
@@ -447,6 +531,13 @@ export const GameRoomProvider = ({ children }) => {
     error,
     playerRole,
     playerWord,
+    gamePhase,
+    currentRound,
+    votes,
+    eliminatedPlayer,
+    winner,
+    scores,
+    readyPlayers,
     create,
     join,
     fetchRoom,
@@ -456,7 +547,11 @@ export const GameRoomProvider = ({ children }) => {
     startGame,
     isHost,
     isPlayerReady,
-    resetState
+    resetState,
+    areAllPlayersReady: () => {
+      if (!room || !room.players) return false;
+      return room.players.every(player => readyPlayers.has(player.userId));
+    }
   };
   
   return (

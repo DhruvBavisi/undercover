@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useGameRoom } from '../context/GameRoomContext';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '../components/ui/card';
-import { Loader2, ArrowLeft, Users, MessageCircle, Clock, AlertCircle, Send, ThumbsUp, Check, X, Award, Crown, Skull } from 'lucide-react';
+import { Loader2, ArrowLeft, Users, MessageCircle, Clock, AlertCircle, Send, ThumbsUp, Check, X, Award, Crown, Skull, RefreshCcw, Pause } from 'lucide-react';
 import { useToast } from '../hooks/use-toast';
 import { Alert, AlertDescription } from '../components/ui/alert';
 import { Input } from '../components/ui/input';
@@ -17,34 +17,61 @@ const OnlineGamePage = () => {
   const { gameCode } = useParams();
   const navigate = useNavigate();
   const { isAuthenticated, user, token } = useAuth();
-  const { room, playerRole, playerWord, loading, error, fetchRoom, isHost, leave } = useGameRoom();
+  const {
+    room,
+    loading,
+    error,
+    playerRole,
+    playerWord,
+    gamePhase,
+    currentRound,
+    votes,
+    eliminatedPlayer,
+    winner,
+    scores,
+    readyPlayers,
+    fetchRoom,
+    toggleReady,
+    startGame,
+    submitWordDescription,
+    submitVote,
+    submitWordGuess,
+    leave,
+    isHost,
+    isPlayerReady,
+    areAllPlayersReady
+  } = useGameRoom();
   const { toast } = useToast();
   
   // State
-  const [currentTurn, setCurrentTurn] = useState(null);
   const [timeLeft, setTimeLeft] = useState(0);
-  const [gamePhase, setGamePhase] = useState('discussion'); // discussion, voting, elimination, gameOver
+  const [currentTurn, setCurrentTurn] = useState(null);
   const [initialFetchDone, setInitialFetchDone] = useState(false);
   const [isStable, setIsStable] = useState(false);
   const [chatMessage, setChatMessage] = useState('');
   const [messages, setMessages] = useState([]);
   const [showVotingDialog, setShowVotingDialog] = useState(false);
   const [selectedPlayer, setSelectedPlayer] = useState(null);
-  const [votes, setVotes] = useState([]);
   const [votingResults, setVotingResults] = useState(null);
-  const [eliminatedPlayer, setEliminatedPlayer] = useState(null);
   const [gameWinner, setGameWinner] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showMrWhiteDialog, setShowMrWhiteDialog] = useState(false);
   const [wordGuess, setWordGuess] = useState('');
   const [guessResult, setGuessResult] = useState(null);
   const [isGuessing, setIsGuessing] = useState(false);
+  const [description, setDescription] = useState('');
+  const [showWordGuessDialog, setShowWordGuessDialog] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const [showQuitConfirm, setShowQuitConfirm] = useState(false);
+  const [showAddPlayerConfirm, setShowAddPlayerConfirm] = useState(false);
   
   // Refs
   const timerIntervalRef = useRef(null);
   const stabilityTimeoutRef = useRef(null);
   const messagesEndRef = useRef(null);
   const chatInputRef = useRef(null);
+  const descriptionInputRef = useRef(null);
+  const chatEndRef = useRef(null);
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -53,6 +80,13 @@ const OnlineGamePage = () => {
     }
   }, [isAuthenticated, navigate]);
 
+  // Redirect to GamePage if game is in waiting phase
+  useEffect(() => {
+    if (room && room.status === 'waiting') {
+      navigate(`/game/${gameCode}`);
+    }
+  }, [room, gameCode, navigate]);
+
   // Fetch room details when component mounts
   const fetchGameRoom = useCallback(async () => {
     if (!isAuthenticated || !gameCode) return;
@@ -60,27 +94,11 @@ const OnlineGamePage = () => {
     console.log(`OnlineGamePage: Fetching room with code ${gameCode}`);
     await fetchRoom(gameCode);
     setInitialFetchDone(true);
-    
-    // Set a timeout to mark the component as stable after initial render
-    if (stabilityTimeoutRef.current) {
-      clearTimeout(stabilityTimeoutRef.current);
-    }
-    
-    stabilityTimeoutRef.current = setTimeout(() => {
-      setIsStable(true);
-    }, 1000);
   }, [isAuthenticated, gameCode, fetchRoom]);
   
   // Initial fetch on mount
   useEffect(() => {
     fetchGameRoom();
-    
-    // Cleanup function
-    return () => {
-      if (stabilityTimeoutRef.current) {
-        clearTimeout(stabilityTimeoutRef.current);
-      }
-    };
   }, [fetchGameRoom]);
 
   // Set up timer when room is loaded
@@ -529,448 +547,431 @@ const OnlineGamePage = () => {
     }
   }, [playerRole, eliminatedPlayer, user.id]);
 
-  // Render loading state
-  if (!initialFetchDone || loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 text-white flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin text-blue-500 mx-auto mb-4" />
-          <p className="text-gray-400">Loading game...</p>
-        </div>
-      </div>
-    );
-  }
+  // Handle manual refresh
+  const handleRefresh = useCallback(async () => {
+    await fetchRoom(gameCode);
+    toast.success('Game room refreshed');
+  }, [fetchRoom, gameCode]);
 
-  // Render error state
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 text-white p-4">
-        <div className="container mx-auto max-w-md text-center">
-          <h1 className="text-2xl font-bold mb-4">Error</h1>
-          <p className="text-red-400 mb-6">{error}</p>
-          <Button onClick={handleBack} className="bg-blue-600 hover:bg-blue-700">
-            Back to Home
-          </Button>
-        </div>
-      </div>
-    );
-  }
+  // Handle ready toggle
+  const handleReadyToggle = useCallback(() => {
+    toggleReady();
+  }, [toggleReady]);
 
-  // Render not found state
-  if (!room) {
-    return (
-      <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 text-white flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold mb-4">Game Not Found</h1>
-          <p className="text-gray-400 mb-6">The game you're looking for doesn't exist or has ended.</p>
-          <Button onClick={() => navigate('/')} className="bg-blue-600 hover:bg-blue-700">
-            Back to Home
-          </Button>
-        </div>
-      </div>
-    );
-  }
+  // Handle game start
+  const handleStartGame = useCallback(() => {
+    if (!areAllPlayersReady()) {
+      toast.error('All players must be ready to start');
+      return;
+    }
+    startGame();
+  }, [areAllPlayersReady, startGame]);
 
-  // Render waiting room if game hasn't started
-  if (room.status === 'waiting') {
-    return (
-      <div className="min-h-screen relative overflow-hidden bg-transparent">
-        <Starfield />
-        <div className="container mx-auto max-w-md relative z-10">
-          <Button 
-            variant="ghost" 
-            className="text-gray-400 hover:text-white p-0 mb-8"
-            onClick={handleBack}
-          >
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Home
-          </Button>
-          
-          <Card className="bg-gray-800 border-gray-700">
-            <CardContent className="p-6">
-              <h2 className="text-xl font-bold mb-4 text-center">Waiting for Players</h2>
-              <p className="text-center text-gray-400 mb-6">Game has not started yet</p>
-              
-              <Button 
-                onClick={() => navigate(`/game/${gameCode}`)}
-                className="w-full bg-blue-600 hover:bg-blue-700"
-              >
-                Go to Waiting Room
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    );
-  }
+  // Handle description submit
+  const handleDescriptionSubmit = useCallback((e) => {
+    e.preventDefault();
+    if (!description.trim()) {
+      toast.error('Please enter a description');
+      return;
+    }
+    submitWordDescription(description);
+    setDescription('');
+  }, [description, submitWordDescription]);
 
-  // Render game in progress
-  return (
-    <div className="min-h-screen relative overflow-hidden bg-transparent">
-      <Starfield />
-      <div className="container mx-auto max-w-md relative z-10">
-        <div className="flex justify-between items-center mb-6">
-          <Button 
-            variant="ghost" 
-            className="text-gray-400 hover:text-white p-0"
-            onClick={handleBack}
-          >
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Leave Game
-          </Button>
-          
-          <div className="flex items-center">
-            <Clock className="h-4 w-4 mr-2 text-yellow-500" />
-            <span className="font-mono">{timeLeft}s</span>
-          </div>
-        </div>
-        
-        <Card className="bg-gray-800 border-gray-700 mb-6">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-xl text-center">Round {room.currentRound || 1}</CardTitle>
-            <CardDescription className="text-center">
-              {gamePhase === 'discussion' && 'Discussion Phase'}
-              {gamePhase === 'voting' && 'Voting Phase'}
-              {gamePhase === 'elimination' && 'Elimination Phase'}
-              {gamePhase === 'gameOver' && 'Game Over'}
-            </CardDescription>
-          </CardHeader>
-          
-          <CardContent>
-            {/* Player's Role and Word */}
-            <div className="bg-gray-700/50 p-4 rounded-lg mb-6">
-              <h3 className="text-sm font-medium mb-2">Your Role</h3>
-              <div className={`p-4 rounded-lg text-center ${
-                playerRole === 'civilian' ? 'bg-blue-900/30 border border-blue-800' :
-                playerRole === 'undercover' ? 'bg-red-900/30 border border-red-800' :
-                'bg-purple-900/30 border border-purple-800'
-              }`}>
-                <div className="flex items-center justify-center mb-3 relative w-24 h-24 mx-auto">
-                  <div className={`absolute inset-0 rounded-full ${
-                    playerRole === 'civilian' ? 'bg-gradient-to-br from-blue-500 to-blue-800' :
-                    playerRole === 'undercover' ? 'bg-gradient-to-br from-red-500 to-red-800' :
-                    'bg-gradient-to-br from-purple-500 to-purple-800'
-                  }`}></div>
-                  <img 
-                    src={`/avatars/${playerRole}.png`} 
-                    alt={playerRole}
-                    className="w-[75%] h-[75%] object-contain absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2"
-                  />
-                </div>
-                <p className="font-bold text-lg mb-2">
-                  {playerRole === 'civilian' && 'Civilian'}
-                  {playerRole === 'undercover' && 'Undercover'}
-                  {playerRole === 'mrwhite' && 'Mr. White'}
-                </p>
-                
-                {playerRole !== 'mrwhite' ? (
-                  <div className="bg-black/30 p-3 rounded-lg">
-                    <p className="text-lg font-mono">
-                      Word: <span className="text-blue-400">{playerWord}</span>
-                    </p>
-                  </div>
-                ) : (
-                  <div className="bg-black/30 p-3 rounded-lg">
-                    <p className="text-sm text-gray-400 italic">
-                      You don't know the word. Listen carefully and try to blend in!
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-            
-            {/* Game Instructions */}
-            <div className="bg-gray-700/20 p-3 rounded-lg mb-6">
-              <h3 className="text-sm font-medium mb-1">Instructions:</h3>
-              {playerRole === 'civilian' && (
-                <p className="text-xs text-gray-300">
-                  Describe your word without saying it directly. Try to identify the Undercover and Mr. White.
-                </p>
-              )}
-              {playerRole === 'undercover' && (
-                <p className="text-xs text-gray-300">
-                  You have a similar but different word. Blend in with the Civilians while trying to identify other Undercovers.
-                </p>
-              )}
-              {playerRole === 'mrwhite' && (
-                <p className="text-xs text-gray-300">
-                  You don't know the word. Listen carefully to figure out what it might be and try to blend in.
-                </p>
-              )}
-            </div>
-            
-            {/* Game Over Display */}
-            {gamePhase === 'gameOver' && gameWinner && (
-              <div className="bg-gray-700/50 p-6 rounded-lg mb-6 text-center">
-                <h3 className="text-2xl font-bold mb-4">Game Over</h3>
-                <div className={`p-6 rounded-lg ${
-                  gameWinner === 'civilians' ? 'bg-blue-900/30 border-2 border-blue-500/50' :
-                  gameWinner === 'undercovers' ? 'bg-red-900/30 border-2 border-red-500/50' :
-                  'bg-purple-900/30 border-2 border-purple-500/50'
-                }`}>
-                  <Award className="h-16 w-16 mx-auto mb-4" />
-                  <p className="text-2xl font-bold mb-2">
-                    {gameWinner === 'civilians' && 'Civilians Win!'}
-                    {gameWinner === 'undercovers' && 'Undercovers Win!'}
-                    {gameWinner === 'mrwhite' && 'Mr. White Wins!'}
-                  </p>
-                  <p className="text-gray-400 mb-4">
-                    {gameWinner === 'civilians' && 'The civilians successfully identified all the impostors!'}
-                    {gameWinner === 'undercovers' && 'The undercovers have successfully deceived the civilians!'}
-                    {gameWinner === 'mrwhite' && 'Mr. White successfully guessed the word!'}
-                  </p>
-                  
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-6">
-                    <Button 
-                      onClick={handleReturnToLobby}
-                      className="w-full bg-gray-600 hover:bg-gray-700 text-white"
-                      disabled={isProcessing}
-                    >
-                      Return to Lobby
-                    </Button>
-                    
-                    {isHost() && (
-                      <Button 
-                        onClick={handlePlayAgain}
-                        className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-                        disabled={isProcessing}
-                      >
-                        {isProcessing ? (
-                          <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Restarting Game...</>
-                        ) : (
-                          'Play Again'
-                        )}
-                      </Button>
-                    )}
-                  </div>
-                  
-                  {!isHost() && (
-                    <p className="text-xs text-gray-400 mt-4">
-                      Waiting for the host to start a new game...
-                    </p>
-                  )}
-                </div>
-              </div>
-            )}
-            
-            {/* Elimination Display */}
-            {gamePhase === 'elimination' && eliminatedPlayer && (
-              <div className="bg-gray-700/50 p-6 rounded-lg mb-6 text-center">
-                <h3 className="text-2xl font-bold mb-4">Player Eliminated</h3>
-                <div className="p-6 bg-red-900/30 border-2 border-red-500/50 rounded-lg">
-                  <div className="flex items-center justify-center mb-4">
-                    <img 
-                      src={`/avatars/${eliminatedPlayer.role}.png`}
-                      alt={eliminatedPlayer.role}
-                      className="w-20 h-20 rounded-full border-2 border-red-500/50"
-                    />
-                  </div>
-                  <p className="text-xl font-bold mb-2">{eliminatedPlayer.name}</p>
-                  <p className="text-lg mb-2">Role: <span className="font-semibold">
-                    {eliminatedPlayer.role === 'civilian' && 'Civilian'}
-                    {eliminatedPlayer.role === 'undercover' && 'Undercover'}
-                    {eliminatedPlayer.role === 'mrwhite' && 'Mr. White'}
-                  </span></p>
-                  {eliminatedPlayer.role !== 'mrwhite' && (
-                    <p className="text-md mt-2">Word: <span className="font-mono text-blue-400">{eliminatedPlayer.word}</span></p>
-                  )}
-                </div>
-                
-                {isHost() && (
-                  <Button 
-                    onClick={handleContinueAfterElimination}
-                    className="w-full mt-6 bg-blue-600 hover:bg-blue-700"
-                    disabled={isProcessing}
-                  >
-                    {isProcessing ? (
-                      <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processing...</>
-                    ) : (
-                      'Continue'
-                    )}
-                  </Button>
-                )}
-              </div>
-            )}
-            
-            {/* Player List */}
-            <h3 className="text-sm font-medium mb-2">Players</h3>
-            <div className="space-y-2 mb-6">
-              {room.players.map((player) => (
-                <div 
-                  key={player.userId} 
-                  className={`flex items-center justify-between p-3 rounded-lg ${
-                    player.userId === currentTurn ? 'bg-yellow-900/30 border border-yellow-800' : 'bg-gray-700/30'
-                  } ${player.isEliminated ? 'opacity-50 bg-red-900/10' : ''} hover:bg-gray-600/30 transition-colors`}
-                >
-                  <div className="flex items-center">
-                    <div className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center mr-3 relative">
-                      {player.name.charAt(0).toUpperCase()}
-                      {player.userId === room.hostId && (
-                        <Crown className="h-4 w-4 text-yellow-400 absolute -top-1 -right-1" />
-                      )}
-                      {player.isEliminated && (
-                        <Skull className="h-4 w-4 text-red-400 absolute -bottom-1 -right-1" />
-                      )}
-                    </div>
-                    <div>
-                      <p className="font-medium">{player.name}</p>
-                      <p className="text-xs text-gray-400">@{player.username}</p>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center space-x-2">
-                    {player.userId === room.hostId && (
-                      <span className="text-xs bg-yellow-600/80 px-2 py-1 rounded">Host</span>
-                    )}
-                    {player.userId === currentTurn && (
-                      <span className="text-xs bg-green-600/80 px-2 py-1 rounded animate-pulse">Speaking</span>
-                    )}
-                    {player.isEliminated && (
-                      <span className="text-xs bg-red-600/80 px-2 py-1 rounded">Eliminated</span>
-                    )}
-                    {votes.some(v => v.votedForId === player.userId) && (
-                      <span className="text-xs bg-blue-600/80 px-2 py-1 rounded">
-                        {votes.filter(v => v.votedForId === player.userId).length} Vote(s)
-                      </span>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-            
-            {/* Chat Section */}
-            {gamePhase === 'discussion' && (
-              <div className="mb-4">
-                <h3 className="text-sm font-medium mb-2">Chat</h3>
-                <div className="bg-gray-700/30 rounded-lg p-3 h-40 overflow-y-auto mb-2">
-                  {messages.length === 0 ? (
-                    <p className="text-gray-500 text-center text-sm">No messages yet</p>
-                  ) : (
-                    messages.map((msg, index) => (
-                      <div key={index} className="mb-2">
-                        <p className="text-xs">
-                          <span className="font-semibold">{msg.playerName}:</span> {msg.content}
-                        </p>
-                      </div>
-                    ))
-                  )}
-                  <div ref={messagesEndRef} />
-                </div>
-                <form onSubmit={handleSendMessage} className="flex space-x-2">
+  // Handle pause toggle
+  const handlePauseToggle = useCallback(() => {
+    setIsPaused(prev => !prev);
+  }, []);
+
+  // Handle quit game
+  const handleQuit = useCallback(() => {
+    setShowQuitConfirm(true);
+  }, []);
+
+  // Handle quit confirm
+  const handleQuitConfirm = useCallback(() => {
+    leave();
+    navigate('/');
+  }, [leave, navigate]);
+
+  // Handle add player
+  const handleAddPlayer = useCallback(() => {
+    setShowAddPlayerConfirm(true);
+  }, []);
+
+  // Render game content based on phase
+  const renderGameContent = () => {
+    switch (gamePhase) {
+      case 'description':
+    return (
+          <div className="space-y-6">
+            <Card className="bg-gray-800/50 border-gray-700">
+              <CardHeader>
+                <CardTitle>Describe Your Word</CardTitle>
+                <CardDescription>
+                  {playerRole === 'mrwhite'
+                    ? "Listen carefully to others' descriptions"
+                    : `Your word is: ${playerWord}`}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleDescriptionSubmit} className="space-y-4">
                   <Input
+                    ref={descriptionInputRef}
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="Enter your description..."
+                    disabled={playerRole === 'mrwhite'}
+                    className="bg-gray-700 border-gray-600"
+                  />
+                  {playerRole !== 'mrwhite' && (
+                    <Button
+                      type="submit"
+                      className="w-full bg-blue-600 hover:bg-blue-700"
+                      disabled={!description.trim()}
+                    >
+                      Submit Description
+          </Button>
+                  )}
+                </form>
+              </CardContent>
+            </Card>
+      </div>
+    );
+
+      case 'discussion':
+    return (
+          <div className="space-y-6">
+            <Card className="bg-gray-800/50 border-gray-700">
+              <CardHeader>
+                <CardTitle>Discussion Phase</CardTitle>
+                <CardDescription>
+                  Time remaining: {Math.ceil(timeLeft / 1000)}s
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="h-60 overflow-y-auto mb-4 space-y-2 p-4 bg-gray-900/50 rounded-lg">
+                  {messages.map(message => (
+                    <div
+                      key={message.id}
+                      className={`flex items-start gap-2 ${
+                        message.userId === user.id ? 'justify-end' : ''
+                      }`}
+                    >
+                      <div
+                        className={`max-w-[80%] rounded-lg p-2 ${
+                          message.userId === user.id
+                            ? 'bg-blue-600'
+                            : 'bg-gray-700'
+                        }`}
+                      >
+                        <p className="text-sm font-medium">
+                          {message.userId === user.id ? 'You' : message.playerName}
+                        </p>
+                        <p className="text-sm">{message.content}</p>
+                      </div>
+                    </div>
+                  ))}
+                  <div ref={chatEndRef} />
+                </div>
+                <form onSubmit={handleSendMessage} className="flex gap-2">
+                  <Input
+                    ref={chatInputRef}
                     value={chatMessage}
                     onChange={(e) => setChatMessage(e.target.value)}
                     placeholder="Type your message..."
                     className="bg-gray-700 border-gray-600"
-                    ref={chatInputRef}
                   />
-                  <Button type="submit" size="icon" className="bg-blue-600 hover:bg-blue-700">
+              <Button 
+                    type="submit"
+                    size="icon"
+                    className="bg-blue-600 hover:bg-blue-700"
+                    disabled={!chatMessage.trim()}
+                  >
                     <Send className="h-4 w-4" />
-                  </Button>
+              </Button>
                 </form>
+            </CardContent>
+          </Card>
+      </div>
+    );
+
+      case 'voting':
+  return (
+          <div className="space-y-6">
+            <Card className="bg-gray-800/50 border-gray-700">
+              <CardHeader>
+                <CardTitle>Voting Phase</CardTitle>
+                <CardDescription>
+                  Select a player to eliminate
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-2">
+                  {room?.players
+                    .filter(p => !p.isEliminated && p.userId !== user.id)
+                    .map(player => (
+          <Button 
+                        key={player.userId}
+                        variant={selectedPlayer === player.userId ? "default" : "outline"}
+                        className="w-full justify-between"
+                        onClick={() => handleVote(player.userId)}
+                        disabled={votes[user.id]}
+                      >
+                        <span>{player.username}</span>
+                        <span className="text-sm text-gray-400">
+                          {Object.values(votes).filter(v => v === player.userId).length} votes
+                        </span>
+          </Button>
+                    ))}
+          </div>
+              </CardContent>
+            </Card>
+        </div>
+        );
+
+      case 'elimination':
+        return (
+          <div className="space-y-6">
+            <Card className="bg-gray-800/50 border-gray-700">
+              <CardHeader>
+                <CardTitle>Elimination</CardTitle>
+                <CardDescription>
+                  {eliminatedPlayer && `${eliminatedPlayer.username} has been eliminated!`}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+                {playerRole === 'mrwhite' && eliminatedPlayer?.userId === user.id && (
+                  <div className="space-y-4">
+                    <p>You have one chance to guess the word!</p>
+                    <form onSubmit={handleMrWhiteGuess} className="space-y-4">
+                      <Input
+                        value={wordGuess}
+                        onChange={(e) => setWordGuess(e.target.value)}
+                        placeholder="Enter your guess..."
+                        className="bg-gray-700 border-gray-600"
+                      />
+                      <Button
+                        type="submit"
+                        className="w-full bg-blue-600 hover:bg-blue-700"
+                        disabled={!wordGuess.trim()}
+                      >
+                        Submit Guess
+                      </Button>
+                    </form>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
               </div>
-            )}
-            
-            {/* Game Actions */}
-            <div className="flex space-x-2">
-              {gamePhase === 'discussion' && (
-                <>
-                  {isHost() && (
-                    <Button 
-                      className="w-full bg-yellow-600 hover:bg-yellow-700"
-                      onClick={handleNextTurn}
-                      disabled={isProcessing}
-                    >
-                      {isProcessing ? (
-                        <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processing...</>
-                      ) : (
-                        'Next Turn'
-                      )}
-                    </Button>
-                  )}
-                  
-                  {isHost() && (
-                    <Button 
-                      className="w-full bg-purple-600 hover:bg-purple-700"
-                      onClick={handleStartVoting}
-                      disabled={isProcessing}
-                    >
-                      {isProcessing ? (
-                        <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processing...</>
-                      ) : (
-                        'Start Voting'
-                      )}
-                    </Button>
-                  )}
-                </>
-              )}
-              
-              {gamePhase === 'voting' && (
-                <Button 
-                  className="w-full bg-red-600 hover:bg-red-700"
-                  onClick={() => setShowVotingDialog(true)}
-                >
-                  Vote
-                </Button>
-              )}
+        );
+
+      case 'gameOver':
+        return (
+          <div className="space-y-6">
+            <Card className="bg-gray-800/50 border-gray-700">
+              <CardHeader>
+                <CardTitle>Game Over</CardTitle>
+                <CardDescription>
+                  {winner
+                    ? `${winner.username} wins!`
+                    : 'The game has ended'}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="grid gap-2">
+                    {Object.entries(scores).map(([userId, score]) => {
+                      const player = room?.players.find(p => p.userId === userId);
+                      return (
+                        <div
+                          key={userId}
+                          className="flex items-center justify-between p-3 rounded-lg bg-gray-700/30"
+                        >
+                          <span>{player?.username}</span>
+                          <span>{score} points</span>
             </div>
-          </CardContent>
-        </Card>
+                      );
+                    })}
+                  </div>
+                  <div className="flex justify-center gap-4">
+                    {isHost() && (
+                    <Button 
+                        onClick={handleStartGame}
+                        className="bg-green-600 hover:bg-green-700"
+                    >
+                        Play Again
+                    </Button>
+                    )}
+                      <Button 
+                      variant="outline"
+                      onClick={handleQuit}
+                    >
+                      Quit Game
+                      </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+              </div>
+        );
+
+      default:
+        return null;
+    }
+  };
+
+  // Render pause menu
+  const renderPauseMenu = () => (
+    <Dialog open={isPaused} onOpenChange={setIsPaused}>
+      <DialogContent className="bg-gray-800 border-gray-700">
+        <DialogHeader>
+          <DialogTitle>Game Paused</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <Button
+            onClick={() => setIsPaused(false)}
+            className="w-full"
+          >
+            Resume Game
+          </Button>
+                {isHost() && (
+                  <Button 
+              onClick={handleStartGame}
+              className="w-full bg-blue-600 hover:bg-blue-700"
+            >
+              Restart Game
+                  </Button>
+                )}
+          <Button
+            variant="outline"
+            onClick={handleAddPlayer}
+            className="w-full"
+          >
+            Add Player
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={handleQuit}
+            className="w-full"
+          >
+            Quit Game
+          </Button>
+              </div>
+      </DialogContent>
+    </Dialog>
+  );
+
+  // Main render
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin" />
+                    </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+                  </div>
+    );
+  }
+
+  if (!room) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>Game room not found</AlertDescription>
+        </Alert>
+                      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen relative overflow-hidden bg-transparent">
+      <Starfield />
+      <div className="container mx-auto max-w-4xl p-4 relative z-10">
+        <div className="flex justify-between items-center mb-6">
+                    <Button 
+            variant="ghost"
+            className="text-gray-400 hover:text-white"
+            onClick={handleQuit}
+          >
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Leave Game
+                    </Button>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <Clock className="h-4 w-4" />
+              <span>{Math.ceil(timeLeft / 1000)}s</span>
+            </div>
+                    <Button 
+              variant="outline"
+              size="icon"
+              onClick={handlePauseToggle}
+              className="h-8 w-8"
+            >
+              <Pause className="h-4 w-4" />
+                    </Button>
+            </div>
+        </div>
+        {renderGameContent()}
       </div>
       
-      {/* Voting Dialog */}
-      <Dialog open={showVotingDialog} onOpenChange={setShowVotingDialog}>
-        <DialogContent className="bg-gray-800 border-gray-700 text-white max-w-lg">
+      {/* Dialogs */}
+      {renderPauseMenu()}
+
+      <Dialog open={showQuitConfirm} onOpenChange={setShowQuitConfirm}>
+        <DialogContent className="bg-gray-800 border-gray-700">
           <DialogHeader>
-            <DialogTitle className="text-2xl">Vote to Eliminate</DialogTitle>
-            <DialogDescription className="text-gray-400">
-              Choose a player to eliminate. The player with the most votes will be eliminated.
+            <DialogTitle>Quit Game</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to quit? This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
-          
-          <div className="space-y-3 my-6">
-            {room.players
-              .filter(player => !player.isEliminated)
-              .map(player => (
-                <Button
-                  key={player.userId}
-                  variant="outline"
-                  className={`w-full justify-between p-4 ${
-                    selectedPlayer === player.userId 
-                      ? 'bg-red-900/30 border-red-600 hover:bg-red-900/40' 
-                      : 'bg-gray-700/50 border-gray-600 hover:bg-gray-600/50'
-                  }`}
-                  onClick={() => handleVote(player.userId)}
-                  disabled={player.userId === user.id || isProcessing}
-                >
-                  <div className="flex items-center">
-                    <div className="h-8 w-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center mr-3">
-                      {player.name.charAt(0).toUpperCase()}
-                    </div>
-                    <span className="font-medium">{player.name}</span>
-                  </div>
-                  
-                  {selectedPlayer === player.userId && (
-                    <Check className="h-5 w-5 text-red-400" />
-                  )}
-                </Button>
-              ))}
-          </div>
-          
           <DialogFooter>
-            <Button
-              variant="ghost"
-              onClick={() => setShowVotingDialog(false)}
-              className="w-full hover:bg-gray-700/50"
+                <Button
+                  variant="outline"
+              onClick={() => setShowQuitConfirm(false)}
             >
               Cancel
+                </Button>
+            <Button
+              variant="destructive"
+              onClick={handleQuitConfirm}
+            >
+              Quit
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Mr. White Dialog */}
-      {renderMrWhiteDialog()}
+      <Dialog open={showAddPlayerConfirm} onOpenChange={setShowAddPlayerConfirm}>
+        <DialogContent className="bg-gray-800 border-gray-700">
+          <DialogHeader>
+            <DialogTitle>Add Player</DialogTitle>
+            <DialogDescription>
+              Share this game code with new players:
+              <code className="ml-2 p-1 bg-gray-900 rounded">
+                {gameCode}
+              </code>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              onClick={() => setShowAddPlayerConfirm(false)}
+            >
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

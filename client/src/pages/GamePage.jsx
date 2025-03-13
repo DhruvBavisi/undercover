@@ -7,7 +7,7 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Slider } from '../components/ui/slider';
-import { Loader2, Copy, ArrowLeft, Users, X } from 'lucide-react';
+import { Loader2, Copy, ArrowLeft, Users, X, RefreshCw } from 'lucide-react';
 import { useToast } from '../hooks/use-toast';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../components/ui/tooltip';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '../components/ui/card';
@@ -241,35 +241,17 @@ export default function GamePage() {
 
             {/* Main Content */}
             <Card className="bg-gray-800 border-gray-700">
-              <CardHeader>
+              <CardHeader className="relative">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute top-4 right-4 text-gray-400 hover:text-gray-200"
+                  onClick={fetchGameRoom}
+                >
+                  <RefreshCw className="h-4 w-4" />
+                </Button>
                 <CardTitle className="text-2xl font-bold text-center">Waiting Room</CardTitle>
-                <CardDescription className="text-center text-gray-400">
-                  {loading ? (
-                    <div className="flex items-center justify-center">
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      Updating...
-                    </div>
-                  ) : room.players.length < 3 ? (
-                    <div className="flex flex-col items-center space-y-1">
-                      <span>Need {3 - room.players.length} more {3 - room.players.length === 1 ? 'player' : 'players'}</span>
-                      <span className="text-sm text-gray-500">Minimum 3 players required</span>
-                    </div>
-                  ) : !room.players.every(p => p.isReady) ? (
-                    <div className="flex flex-col items-center space-y-1">
-                      <span>Waiting for players to be ready</span>
-                      <span className="text-sm text-gray-500">
-                        {room.players.filter(p => p.isReady).length} of {room.players.length} ready
-                      </span>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col items-center space-y-1">
-                      <span className="text-green-400">All players ready!</span>
-                      <span className="text-sm text-gray-500">Game can be started</span>
-                    </div>
-                  )}
-                </CardDescription>
               </CardHeader>
-
               <CardContent className="space-y-6">
                 {/* Player Count */}
                 <div className="flex items-center justify-center bg-gray-700/50 rounded-lg p-4">
@@ -327,8 +309,8 @@ export default function GamePage() {
                       onClick={toggleReady}
                       className={`w-full py-4 text-lg font-medium ${
                         isPlayerReady()
-                          ? 'bg-red-600 hover:bg-red-700'
-                          : 'bg-green-600 hover:bg-green-700'
+                          ? '!bg-red-600 hover:!bg-red-700'
+                          : '!bg-green-600 hover:!bg-green-700'
                       }`}
                       disabled={loading}
                     >
@@ -341,25 +323,22 @@ export default function GamePage() {
                       )}
                     </Button>
                   ) : (
-                    <Button
-                      onClick={handleStartGame}
-                      className="w-full py-4 text-lg font-medium bg-blue-600 hover:bg-blue-700"
-                      disabled={
-                        room.players.length < 3 ||
-                        !room.players.every(p => p.isReady) ||
-                        isRedirecting
-                      }
-                    >
-                      {isRedirecting ? (
-                        <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Starting...</>
-                      ) : room.players.length < 3 ? (
-                        `Need ${3 - room.players.length} More Players`
-                      ) : !room.players.every(p => p.isReady) ? (
-                        'Waiting for Players to be Ready'
-                      ) : (
-                        'Start Game'
-                      )}
-                    </Button>
+                    <CardFooter className="flex justify-between">
+                      <Button
+                        onClick={toggleReady}
+                        disabled={isRedirecting}
+                        className={`${isPlayerReady() ? '!bg-red-600 hover:!bg-red-700' : '!bg-green-600 hover:!bg-green-700'} !important`}
+                      >
+                        {isPlayerReady() ? 'Not Ready' : 'Ready'}
+                      </Button>
+                      <Button
+                        onClick={handleStartGame}
+                        disabled={isRedirecting || !room.players.every(p => p.isReady)}
+                        className="bg-green-600 hover:bg-green-700"
+                      >
+                        Start Game
+                      </Button>
+                    </CardFooter>
                   )}
                 </div>
               </CardContent>
@@ -377,12 +356,12 @@ export default function GamePage() {
           <div className="text-center">
             <Loader2 className="h-8 w-8 animate-spin text-blue-500 mx-auto mb-4" />
             <p className="text-gray-400">Game in progress, redirecting...</p>
-                  <Button
+            <Button
               onClick={() => navigate(`/online-game/${gameCode}`)}
               className="mt-4 bg-blue-600 hover:bg-blue-700"
-                  >
+            >
               Go to Game
-                  </Button>
+            </Button>
           </div>
         </div>
       );
