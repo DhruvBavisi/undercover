@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 // 200 unique word pairs for the Undercover game - simple single words
 const wordPairs = [
   { civilian: 'Cat', undercover: 'Dog', category: 'animals' },
@@ -198,6 +199,108 @@ const wordPairs = [
   { civilian: 'Art', undercover: 'Craft', category: 'creation' },
   { civilian: 'Paint', undercover: 'Draw', category: 'art' },
   { civilian: 'Photo', undercover: 'Image', category: 'picture' }
+=======
+const wordPairs = [
+  // General
+  { civilian: 'Sun', undercover: 'Moon', category: 'General' },
+  { civilian: 'Chair', undercover: 'Table', category: 'General' },
+  { civilian: 'Car', undercover: 'Bike', category: 'General' },
+  { civilian: 'Pen', undercover: 'Pencil', category: 'General' },
+  { civilian: 'Clock', undercover: 'Watch', category: 'General' },
+  { civilian: 'Hand', undercover: 'Foot', category: 'General' },
+  { civilian: 'Window', undercover: 'Door', category: 'General' },
+  { civilian: 'School', undercover: 'College', category: 'General' },
+  { civilian: 'Rain', undercover: 'Snow', category: 'General' },
+  { civilian: 'Street', undercover: 'Road', category: 'General' },
+  { civilian: 'Tree', undercover: 'Plant', category: 'General' },
+  { civilian: 'House', undercover: 'Apartment', category: 'General' },
+  { civilian: 'Shoe', undercover: 'Sandal', category: 'General' },
+  { civilian: 'Key', undercover: 'Lock', category: 'General' },
+  { civilian: 'Bus', undercover: 'Train', category: 'General' },
+  { civilian: 'Bed', undercover: 'Sofa', category: 'General' },
+  { civilian: 'Hat', undercover: 'Cap', category: 'General' },
+  { civilian: 'Cloud', undercover: 'Fog', category: 'General' },
+  { civilian: 'Battery', undercover: 'Charger', category: 'General' },
+  { civilian: 'Ladder', undercover: 'Stairs', category: 'General' },
+
+  // Animals
+  { civilian: 'Cat', undercover: 'Dog', category: 'Animals' },
+  { civilian: 'Lion', undercover: 'Tiger', category: 'Animals' },
+  { civilian: 'Fish', undercover: 'Shark', category: 'Animals' },
+  { civilian: 'Cow', undercover: 'Buffalo', category: 'Animals' },
+  { civilian: 'Sheep', undercover: 'Goat', category: 'Animals' },
+  { civilian: 'Frog', undercover: 'Toad', category: 'Animals' },
+  { civilian: 'Dolphin', undercover: 'Whale', category: 'Animals' },
+  { civilian: 'Butterfly', undercover: 'Moth', category: 'Animals' },
+  { civilian: 'Eagle', undercover: 'Hawk', category: 'Animals' },
+  { civilian: 'Horse', undercover: 'Donkey', category: 'Animals' },
+  { civilian: 'Parrot', undercover: 'Pigeon', category: 'Animals' },
+  { civilian: 'Ant', undercover: 'Bee', category: 'Animals' },
+  { civilian: 'Cheetah', undercover: 'Leopard', category: 'Animals' },
+  { civilian: 'Deer', undercover: 'Moose', category: 'Animals' },
+  { civilian: 'Wolf', undercover: 'Fox', category: 'Animals' },
+  { civilian: 'Rabbit', undercover: 'Squirrel', category: 'Animals' },
+  { civilian: 'Crocodile', undercover: 'Alligator', category: 'Animals' },
+  { civilian: 'Peacock', undercover: 'Ostrich', category: 'Animals' },
+  { civilian: 'Octopus', undercover: 'Squid', category: 'Animals' },
+  { civilian: 'Penguin', undercover: 'Seal', category: 'Animals' },
+
+  // Movies
+  { civilian: 'Avengers', undercover: 'Justice League', category: 'Movies' },
+  { civilian: 'Batman', undercover: 'Superman', category: 'Movies' },
+  { civilian: 'Titanic', undercover: 'Avatar', category: 'Movies' },
+  { civilian: 'Harry Potter', undercover: 'Lord of the Rings', category: 'Movies' },
+  { civilian: 'Spider-Man', undercover: 'Iron Man', category: 'Movies' },
+  { civilian: 'Frozen', undercover: 'Moana', category: 'Movies' },
+  { civilian: 'Inception', undercover: 'Interstellar', category: 'Movies' },
+  { civilian: 'Toy Story', undercover: 'Finding Nemo', category: 'Movies' },
+  { civilian: 'Jaws', undercover: 'Godzilla', category: 'Movies' },
+  { civilian: 'Fast & Furious', undercover: 'Need for Speed', category: 'Movies' },
+  { civilian: 'Star Wars', undercover: 'Star Trek', category: 'Movies' },
+  { civilian: 'The Matrix', undercover: 'Blade Runner', category: 'Movies' },
+  { civilian: 'Deadpool', undercover: 'Wolverine', category: 'Movies' },
+  { civilian: 'The Dark Knight', undercover: 'Joker', category: 'Movies' },
+  { civilian: 'The Lion King', undercover: 'Madagascar', category: 'Movies' },
+  { civilian: 'Cinderella', undercover: 'Snow White', category: 'Movies' },
+  { civilian: 'The Godfather', undercover: 'Scarface', category: 'Movies' },
+  { civilian: 'Black Panther', undercover: 'Aquaman', category: 'Movies' },
+  { civilian: 'The Conjuring', undercover: 'Insidious', category: 'Movies' },
+  { civilian: 'Shrek', undercover: 'Kung Fu Panda', category: 'Movies' },
+
+  // Food
+  { civilian: 'Pizza', undercover: 'Burger', category: 'Food' },
+  { civilian: 'Pasta', undercover: 'Noodles', category: 'Food' },
+  { civilian: 'Rice', undercover: 'Bread', category: 'Food' },
+  { civilian: 'Milk', undercover: 'Juice', category: 'Food' },
+  { civilian: 'Apple', undercover: 'Banana', category: 'Food' },
+  { civilian: 'Chocolate', undercover: 'Candy', category: 'Food' },
+  { civilian: 'Salt', undercover: 'Sugar', category: 'Food' },
+  { civilian: 'Butter', undercover: 'Cheese', category: 'Food' },
+  { civilian: 'Tea', undercover: 'Coffee', category: 'Food' },
+  { civilian: 'Strawberry', undercover: 'Blueberry', category: 'Food' },
+  { civilian: 'Orange', undercover: 'Mango', category: 'Food' },
+  { civilian: 'Egg', undercover: 'Omelet', category: 'Food' },
+  { civilian: 'Honey', undercover: 'Syrup', category: 'Food' },
+  { civilian: 'Coconut', undercover: 'Almond', category: 'Food' },
+  { civilian: 'Ice Cream', undercover: 'Cake', category: 'Food' },
+  { civilian: 'Tomato', undercover: 'Potato', category: 'Food' },
+  { civilian: 'Carrot', undercover: 'Beetroot', category: 'Food' },
+  { civilian: 'Spinach', undercover: 'Cabbage', category: 'Food' },
+  { civilian: 'Corn', undercover: 'Wheat', category: 'Food' },
+  { civilian: 'Lemon', undercover: 'Lime', category: 'Food' },
+
+  // Technology
+  { civilian: 'Laptop', undercover: 'Tablet', category: 'Technology' },
+  { civilian: 'Phone', undercover: 'Smartwatch', category: 'Technology' },
+  { civilian: 'Keyboard', undercover: 'Mouse', category: 'Technology' },
+  { civilian: 'TV', undercover: 'Projector', category: 'Technology' },
+  { civilian: 'WiFi', undercover: 'Bluetooth', category: 'Technology' },
+  { civilian: 'Charger', undercover: 'Battery', category: 'Technology' },
+  { civilian: 'Drone', undercover: 'Helicopter', category: 'Technology' },
+  { civilian: 'USB', undercover: 'Hard Drive', category: 'Technology' },
+  { civilian: 'Camera', undercover: 'Camcorder', category: 'Technology' },
+  { civilian: 'Robot', undercover: 'AI', category: 'Technology' }
+>>>>>>> acee4249aaca93903e8f897da575f14caed84efd
 ];
 
 export default wordPairs;
