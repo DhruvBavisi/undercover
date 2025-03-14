@@ -64,813 +64,94 @@ const OnlineGamePage = () => {
   const [isPaused, setIsPaused] = useState(false);
   const [showQuitConfirm, setShowQuitConfirm] = useState(false);
   const [showAddPlayerConfirm, setShowAddPlayerConfirm] = useState(false);
-  
-  // Refs
-  const timerIntervalRef = useRef(null);
-  const stabilityTimeoutRef = useRef(null);
+  const [speakingOrder, setSpeakingOrder] = useState([]);
+  const [usedDescriptions, setUsedDescriptions] = useState(new Set());
+  const [descriptionError, setDescriptionError] = useState('');
+  const [localCurrentRound, setLocalCurrentRound] = useState(1);
+  const [localGamePhase, setLocalGamePhase] = useState('waiting');
+
+  // Add refs
   const messagesEndRef = useRef(null);
-  const chatInputRef = useRef(null);
   const descriptionInputRef = useRef(null);
-  const chatEndRef = useRef(null);
 
-  // Redirect to login if not authenticated
-  useEffect(() => {
-    if (!isAuthenticated) {
-      navigate('/login');
-    }
-  }, [isAuthenticated, navigate]);
-
-  // Redirect to GamePage if game is in waiting phase
-  useEffect(() => {
-    if (room && room.status === 'waiting') {
-      navigate(`/game/${gameCode}`);
-    }
-  }, [room, gameCode, navigate]);
-
-  // Fetch room details when component mounts
-  const fetchGameRoom = useCallback(async () => {
-    if (!isAuthenticated || !gameCode) return;
-    
-    console.log(`OnlineGamePage: Fetching room with code ${gameCode}`);
-    await fetchRoom(gameCode);
-    setInitialFetchDone(true);
-  }, [isAuthenticated, gameCode, fetchRoom]);
-  
-  // Initial fetch on mount
-  useEffect(() => {
-    fetchGameRoom();
-  }, [fetchGameRoom]);
-
-  // Set up timer when room is loaded
-  useEffect(() => {
-    if (!room || !isStable) return;
-    
-    if (room.status === 'in-progress') {
-      // Set initial timer based on room settings
-      setTimeLeft(room.settings.roundTime);
-      
-      // Clear any existing interval
-      if (timerIntervalRef.current) {
-        clearInterval(timerIntervalRef.current);
-      }
-      
-      // Set up interval to count down
-      timerIntervalRef.current = setInterval(() => {
-        setTimeLeft(prev => {
-          if (prev <= 0) {
-            clearInterval(timerIntervalRef.current);
-            // Auto-advance to next phase if time runs out
-            if (gamePhase === 'discussion' && isHost()) {
-              handleStartVoting();
-            }
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    }
-    
-    // Clean up interval on unmount
-    return () => {
-      if (timerIntervalRef.current) {
-        clearInterval(timerIntervalRef.current);
-      }
-    };
-  }, [room, isStable, gamePhase]);
-
-  // Handle player turn changes
-  useEffect(() => {
-    if (!room || !isStable) return;
-    
-    if (room.status === 'in-progress' && room.rounds && room.rounds.length > 0) {
-      const currentRound = room.rounds[room.currentRound - 1];
-      if (currentRound) {
-        setCurrentTurn(currentRound.playerTurn);
-      }
-    }
-  }, [room, isStable]);
-  
-  // Scroll to bottom of chat when messages change
-  useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [messages]);
-  
-  // Set up socket listeners for game events
-  useEffect(() => {
-    if (!room || !isStable) return;
-    
-    // Set up socket listeners for game events
-    const socket = window.socket;
-    if (!socket) return;
-
-    // Listen for chat messages
-    const handleChatMessage = (message) => {
-      setMessages(prev => [...prev, message]);
-    };
-    
-    // Listen for vote submissions
-    const handleVoteSubmitted = (voteData) => {
-      setVotes(prev => [...prev, voteData]);
-      
-      // Show toast notification
-      toast({
-        title: "Vote Submitted",
-        description: "A player has cast their vote.",
-      });
-    };
-    
-    // Listen for voting results
-    const handleVotingResults = (results) => {
-      setVotingResults(results);
-      setGamePhase('elimination');
-      setEliminatedPlayer(results.eliminatedPlayer);
-      
-      // Reset votes
-      setVotes([]);
-      
-      // Check if game is over
-      if (results.gameOver) {
-        setGamePhase('gameOver');
-        setGameWinner(results.winner);
-      }
-    };
-    
-    // Listen for next turn
-    const handleNextTurn = (turnData) => {
-      setCurrentTurn(turnData.playerId);
-      setTimeLeft(room.settings.roundTime);
-    };
-    
-    // Listen for phase change
-    const handlePhaseChange = (phaseData) => {
-      setGamePhase(phaseData.phase);
-      
-      if (phaseData.phase === 'voting') {
-        setShowVotingDialog(true);
-      }
-    };
-    
-    // Listen for Mr. White's last chance
-    const handleMrWhiteLastChance = (data) => {
-      if (data.playerId === user.id) {
-        setShowMrWhiteDialog(true);
-        // Reset any previous guess results
-        setGuessResult(null);
-        setWordGuess('');
-      }
-    };
-
-    const handleGuessResult = (result) => {
-      setGuessResult(result);
-      setIsGuessing(false);
-      
-      if (!result.success) {
-        toast({
-          title: "Incorrect Guess",
-          description: "That was not the correct word.",
-          variant: "destructive"
-        });
-      }
-    };
-    
-    // Set up listeners
-    socket.on('receive-message', handleChatMessage);
-    socket.on('vote-submitted', handleVoteSubmitted);
-    socket.on('voting-results', handleVotingResults);
-    socket.on('next-turn', handleNextTurn);
-    socket.on('phase-change', handlePhaseChange);
-    socket.on('mr-white-last-chance', handleMrWhiteLastChance);
-    socket.on('guess-result', handleGuessResult);
-    
-    // Clean up listeners
-    return () => {
-      socket.off('receive-message', handleChatMessage);
-      socket.off('vote-submitted', handleVoteSubmitted);
-      socket.off('voting-results', handleVotingResults);
-      socket.off('next-turn', handleNextTurn);
-      socket.off('phase-change', handlePhaseChange);
-      socket.off('mr-white-last-chance', handleMrWhiteLastChance);
-      socket.off('guess-result', handleGuessResult);
-    };
-  }, [room, isStable, toast, user.id]);
-
-  // Handle back button
-  const handleBack = () => {
-    // Show confirmation before leaving
-    if (confirm('Are you sure you want to leave the game?')) {
-      leave();
-      navigate('/');
-    }
-  };
-  
-  // Handle chat message submission
-  const handleSendMessage = (e) => {
+  // Handle description submission
+  const handleDescriptionSubmit = async (e) => {
     e.preventDefault();
     
-    if (!chatMessage.trim()) return;
-    
-    // Emit chat message event
-    const socket = window.socket;
-    if (socket && room) {
-      socket.emit('send-message', {
-        gameCode: room.roomCode,
-        playerId: user.id,
-        content: chatMessage
-      });
+    if (!description.trim() || playerRole === 'mrwhite' || currentTurn !== user.id) {
+      return;
+    }
+
+    try {
+      setIsProcessing(true);
+      await submitWordDescription(description.trim());
+      
+      // Add message to local state
+      setMessages(prev => [...prev, {
+        playerName: user.username,
+        content: description.trim()
+      }]);
       
       // Clear input
-      setChatMessage('');
+      setDescription('');
       
-      // Focus input
-      if (chatInputRef.current) {
-        chatInputRef.current.focus();
+      // Focus input for next player
+      if (descriptionInputRef.current) {
+        descriptionInputRef.current.focus();
       }
-    }
-  };
-  
-  // Handle vote submission
-  const handleVote = (playerId) => {
-    setSelectedPlayer(playerId);
-    
-    // Emit vote event
-    const socket = window.socket;
-    if (socket && room) {
-      setIsProcessing(true);
       
-      socket.emit('submit-vote', {
-        gameCode: room.roomCode,
-        voterId: user.id,
-        votedForId: playerId
-      });
-      
-      // Close dialog after vote
-      setTimeout(() => {
-        setShowVotingDialog(false);
-        setIsProcessing(false);
-        
-        toast({
-          title: "Vote Submitted",
-          description: "Your vote has been submitted.",
-        });
-      }, 500);
-    }
-  };
-  
-  // Handle next turn (host only)
-  const handleNextTurn = () => {
-    if (!isHost()) return;
-    
-    setIsProcessing(true);
-    
-    // Find next player who isn't eliminated
-    const activePlayers = room.players.filter(p => !p.isEliminated);
-    const currentPlayerIndex = activePlayers.findIndex(p => p.userId === currentTurn);
-    const nextPlayerIndex = (currentPlayerIndex + 1) % activePlayers.length;
-    const nextPlayerId = activePlayers[nextPlayerIndex].userId;
-    
-    // Emit next turn event
-    const socket = window.socket;
-    if (socket && room) {
-      socket.emit('next-turn', {
-        gameCode: room.roomCode,
-        playerId: nextPlayerId
-      });
-    }
-    
-    setIsProcessing(false);
-  };
-  
-  // Handle start voting (host only)
-  const handleStartVoting = () => {
-    if (!isHost()) return;
-    
-    setIsProcessing(true);
-    
-    // Emit phase change event
-    const socket = window.socket;
-    if (socket && room) {
-      socket.emit('change-game-phase', {
-        gameCode: room.roomCode,
-        newPhase: 'voting'
-      });
-      
-      // Show voting dialog for all players
-      setGamePhase('voting');
-      setShowVotingDialog(true);
-    }
-    
-    setIsProcessing(false);
-  };
-  
-  // Handle continue after elimination
-  const handleContinueAfterElimination = () => {
-    if (!isHost()) return;
-    
-    setIsProcessing(true);
-    
-    // Emit phase change event
-    const socket = window.socket;
-    if (socket && room) {
-      // If game is over, end the game
-      if (votingResults && votingResults.gameOver) {
-        socket.emit('change-game-phase', {
-          gameCode: room.roomCode,
-          newPhase: 'gameOver'
-        });
-        setGamePhase('gameOver');
-      } else {
-        // Otherwise, go back to discussion
-        socket.emit('change-game-phase', {
-          gameCode: room.roomCode,
-          newPhase: 'discussion'
-        });
-        setGamePhase('discussion');
-        
-        // Reset timer
-        setTimeLeft(room.settings.roundTime);
+      // Scroll to bottom
+      if (messagesEndRef.current) {
+        messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
       }
-    }
-    
-    setIsProcessing(false);
-  };
-  
-  // Handle return to lobby
-  const handleReturnToLobby = () => {
-    navigate('/');
-  };
-  
-  // Handle play again
-  const handlePlayAgain = () => {
-    if (!isHost()) {
-      toast({
-        title: "Only Host Can Restart",
-        description: "Only the host can start a new game.",
-        variant: "default"
-      });
-      return;
-    }
-    
-    setIsProcessing(true);
-    
-    // Reset game state on server
-    fetch(`${API_URL}/game-rooms/rooms/${room.roomCode}/reset`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      }
-    })
-    .then(response => response.json())
-    .then(data => {
-      if (data.success) {
-        // Navigate back to waiting room
-        navigate(`/game/${room.roomCode}`);
-      } else {
-        toast({
-          title: "Error",
-          description: data.message || "Failed to restart game",
-          variant: "destructive"
-        });
-        setIsProcessing(false);
-      }
-    })
-    .catch(err => {
-      console.error('Error resetting game:', err);
+    } catch (error) {
+      console.error('Error submitting description:', error);
       toast({
         title: "Error",
-        description: "Failed to restart game",
+        description: "Failed to submit description. Please try again.",
         variant: "destructive"
       });
+    } finally {
       setIsProcessing(false);
-    });
-  };
-
-  // Handle Mr. White guess
-  const handleMrWhiteGuess = (e) => {
-    e.preventDefault();
-    if (!wordGuess.trim() || isGuessing) return;
-    
-    setIsGuessing(true);
-    
-    // Send guess to server
-    const socket = window.socket;
-    if (socket && room) {
-      socket.emit('mr-white-guess', {
-        gameCode,
-        playerId: user.id,
-        word: wordGuess.trim()
-      });
     }
-    
-    // Reset form
-    setWordGuess('');
   };
 
-  // Render Mr. White dialog
-  const renderMrWhiteDialog = () => {
-    return (
-      <Dialog open={showMrWhiteDialog} onOpenChange={setShowMrWhiteDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Mr. White's Last Chance</DialogTitle>
-            <DialogDescription>
-              You've been caught! As Mr. White, you have one chance to guess the civilian's word and win the game.
-            </DialogDescription>
-          </DialogHeader>
-          
-          <form onSubmit={handleMrWhiteGuess} className="space-y-4 mt-4">
-            <Input
-              placeholder="Enter your guess..."
-              value={wordGuess}
-              onChange={(e) => setWordGuess(e.target.value)}
-              disabled={isGuessing}
-              autoFocus
-            />
-            
-            {guessResult && (
-              <Alert className={guessResult.isCorrect ? 'bg-green-500/20' : 'bg-red-500/20'}>
-                <AlertDescription>
-                  {guessResult.isCorrect 
-                    ? 'Correct! You win the game!' 
-                    : `Wrong guess. The correct word was "${guessResult.correctWord}".`}
-                </AlertDescription>
-              </Alert>
-            )}
-            
-            <DialogFooter>
-              <Button 
-                type="submit" 
-                disabled={!wordGuess.trim() || isGuessing}
-                className="w-full"
-              >
-                {isGuessing ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : null}
-                Submit Guess
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-    );
-  };
-
-  // Add socket listener for Mr. White guess result
+  // Add useEffect for game phase initialization
   useEffect(() => {
-    if (!socket || !isStable) return;
-    
-    const handleMrWhiteGuessResult = (result) => {
-      console.log('Mr. White guess result:', result);
-      setGuessResult(result);
-      setIsGuessing(false);
-      
-      // If game is over, update game state
-      if (result.gameOver) {
-        setGameWinner(result.winner);
-        setGamePhase('gameOver');
+    if (room?.status === 'in-progress' && !initialFetchDone) {
+      setLocalGamePhase('description');
+      setLocalCurrentRound(room.currentRound || 1);
+      if (room.speakingOrder && room.speakingOrder.length > 0) {
+        setSpeakingOrder(room.speakingOrder);
+        setCurrentTurn(room.speakingOrder[0]);
       }
-    };
-    
-    socket.on('mr-white-guess-result', handleMrWhiteGuessResult);
-    
-    return () => {
-      socket.off('mr-white-guess-result', handleMrWhiteGuessResult);
-    };
-  }, [socket, isStable]);
+      setInitialFetchDone(true);
+    }
+  }, [room, initialFetchDone]);
 
-  // Show Mr. White dialog when player is eliminated and is Mr. White
+  // Add useEffect for game phase updates
   useEffect(() => {
-    if (playerRole === 'mrwhite' && eliminatedPlayer?.id === user.id) {
-      setShowMrWhiteDialog(true);
+    if (room?.gamePhase) {
+      setLocalGamePhase(room.gamePhase);
     }
-  }, [playerRole, eliminatedPlayer, user.id]);
-
-  // Handle manual refresh
-  const handleRefresh = useCallback(async () => {
-    await fetchRoom(gameCode);
-    toast.success('Game room refreshed');
-  }, [fetchRoom, gameCode]);
-
-  // Handle ready toggle
-  const handleReadyToggle = useCallback(() => {
-    toggleReady();
-  }, [toggleReady]);
-
-  // Handle game start
-  const handleStartGame = useCallback(() => {
-    if (!areAllPlayersReady()) {
-      toast.error('All players must be ready to start');
-      return;
+    if (room?.currentRound) {
+      setLocalCurrentRound(room.currentRound);
     }
-    startGame();
-  }, [areAllPlayersReady, startGame]);
-
-  // Handle description submit
-  const handleDescriptionSubmit = useCallback((e) => {
-    e.preventDefault();
-    if (!description.trim()) {
-      toast.error('Please enter a description');
-      return;
+    if (room?.playerTurn) {
+      setCurrentTurn(room.playerTurn);
     }
-    submitWordDescription(description);
-    setDescription('');
-  }, [description, submitWordDescription]);
+  }, [room?.gamePhase, room?.currentRound, room?.playerTurn]);
 
-  // Handle pause toggle
-  const handlePauseToggle = useCallback(() => {
-    setIsPaused(prev => !prev);
-  }, []);
-
-  // Handle quit game
-  const handleQuit = useCallback(() => {
-    setShowQuitConfirm(true);
-  }, []);
-
-  // Handle quit confirm
-  const handleQuitConfirm = useCallback(() => {
-    leave();
-    navigate('/');
-  }, [leave, navigate]);
-
-  // Handle add player
-  const handleAddPlayer = useCallback(() => {
-    setShowAddPlayerConfirm(true);
-  }, []);
-
-  // Render game content based on phase
-  const renderGameContent = () => {
-    switch (gamePhase) {
-      case 'description':
-    return (
-          <div className="space-y-6">
-            <Card className="bg-gray-800/50 border-gray-700">
-              <CardHeader>
-                <CardTitle>Describe Your Word</CardTitle>
-                <CardDescription>
-                  {playerRole === 'mrwhite'
-                    ? "Listen carefully to others' descriptions"
-                    : `Your word is: ${playerWord}`}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleDescriptionSubmit} className="space-y-4">
-                  <Input
-                    ref={descriptionInputRef}
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    placeholder="Enter your description..."
-                    disabled={playerRole === 'mrwhite'}
-                    className="bg-gray-700 border-gray-600"
-                  />
-                  {playerRole !== 'mrwhite' && (
-                    <Button
-                      type="submit"
-                      className="w-full bg-blue-600 hover:bg-blue-700"
-                      disabled={!description.trim()}
-                    >
-                      Submit Description
-          </Button>
-                  )}
-                </form>
-              </CardContent>
-            </Card>
-      </div>
-    );
-
-      case 'discussion':
-    return (
-          <div className="space-y-6">
-            <Card className="bg-gray-800/50 border-gray-700">
-              <CardHeader>
-                <CardTitle>Discussion Phase</CardTitle>
-                <CardDescription>
-                  Time remaining: {Math.ceil(timeLeft / 1000)}s
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="h-60 overflow-y-auto mb-4 space-y-2 p-4 bg-gray-900/50 rounded-lg">
-                  {messages.map(message => (
-                    <div
-                      key={message.id}
-                      className={`flex items-start gap-2 ${
-                        message.userId === user.id ? 'justify-end' : ''
-                      }`}
-                    >
-                      <div
-                        className={`max-w-[80%] rounded-lg p-2 ${
-                          message.userId === user.id
-                            ? 'bg-blue-600'
-                            : 'bg-gray-700'
-                        }`}
-                      >
-                        <p className="text-sm font-medium">
-                          {message.userId === user.id ? 'You' : message.playerName}
-                        </p>
-                        <p className="text-sm">{message.content}</p>
-                      </div>
-                    </div>
-                  ))}
-                  <div ref={chatEndRef} />
-                </div>
-                <form onSubmit={handleSendMessage} className="flex gap-2">
-                  <Input
-                    ref={chatInputRef}
-                    value={chatMessage}
-                    onChange={(e) => setChatMessage(e.target.value)}
-                    placeholder="Type your message..."
-                    className="bg-gray-700 border-gray-600"
-                  />
-              <Button 
-                    type="submit"
-                    size="icon"
-                    className="bg-blue-600 hover:bg-blue-700"
-                    disabled={!chatMessage.trim()}
-                  >
-                    <Send className="h-4 w-4" />
-              </Button>
-                </form>
-            </CardContent>
-          </Card>
-      </div>
-    );
-
-      case 'voting':
-  return (
-          <div className="space-y-6">
-            <Card className="bg-gray-800/50 border-gray-700">
-              <CardHeader>
-                <CardTitle>Voting Phase</CardTitle>
-                <CardDescription>
-                  Select a player to eliminate
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-2">
-                  {room?.players
-                    .filter(p => !p.isEliminated && p.userId !== user.id)
-                    .map(player => (
-          <Button 
-                        key={player.userId}
-                        variant={selectedPlayer === player.userId ? "default" : "outline"}
-                        className="w-full justify-between"
-                        onClick={() => handleVote(player.userId)}
-                        disabled={votes[user.id]}
-                      >
-                        <span>{player.username}</span>
-                        <span className="text-sm text-gray-400">
-                          {Object.values(votes).filter(v => v === player.userId).length} votes
-                        </span>
-          </Button>
-                    ))}
-          </div>
-              </CardContent>
-            </Card>
-        </div>
-        );
-
-      case 'elimination':
-        return (
-          <div className="space-y-6">
-            <Card className="bg-gray-800/50 border-gray-700">
-              <CardHeader>
-                <CardTitle>Elimination</CardTitle>
-                <CardDescription>
-                  {eliminatedPlayer && `${eliminatedPlayer.username} has been eliminated!`}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-                {playerRole === 'mrwhite' && eliminatedPlayer?.userId === user.id && (
-                  <div className="space-y-4">
-                    <p>You have one chance to guess the word!</p>
-                    <form onSubmit={handleMrWhiteGuess} className="space-y-4">
-                      <Input
-                        value={wordGuess}
-                        onChange={(e) => setWordGuess(e.target.value)}
-                        placeholder="Enter your guess..."
-                        className="bg-gray-700 border-gray-600"
-                      />
-                      <Button
-                        type="submit"
-                        className="w-full bg-blue-600 hover:bg-blue-700"
-                        disabled={!wordGuess.trim()}
-                      >
-                        Submit Guess
-                      </Button>
-                    </form>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-              </div>
-        );
-
-      case 'gameOver':
-        return (
-          <div className="space-y-6">
-            <Card className="bg-gray-800/50 border-gray-700">
-              <CardHeader>
-                <CardTitle>Game Over</CardTitle>
-                <CardDescription>
-                  {winner
-                    ? `${winner.username} wins!`
-                    : 'The game has ended'}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="grid gap-2">
-                    {Object.entries(scores).map(([userId, score]) => {
-                      const player = room?.players.find(p => p.userId === userId);
-                      return (
-                        <div
-                          key={userId}
-                          className="flex items-center justify-between p-3 rounded-lg bg-gray-700/30"
-                        >
-                          <span>{player?.username}</span>
-                          <span>{score} points</span>
-            </div>
-                      );
-                    })}
-                  </div>
-                  <div className="flex justify-center gap-4">
-                    {isHost() && (
-                    <Button 
-                        onClick={handleStartGame}
-                        className="bg-green-600 hover:bg-green-700"
-                    >
-                        Play Again
-                    </Button>
-                    )}
-                      <Button 
-                      variant="outline"
-                      onClick={handleQuit}
-                    >
-                      Quit Game
-                      </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-              </div>
-        );
-
-      default:
-        return null;
-    }
-  };
-
-  // Render pause menu
-  const renderPauseMenu = () => (
-    <Dialog open={isPaused} onOpenChange={setIsPaused}>
-      <DialogContent className="bg-gray-800 border-gray-700">
-        <DialogHeader>
-          <DialogTitle>Game Paused</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4">
-          <Button
-            onClick={() => setIsPaused(false)}
-            className="w-full"
-          >
-            Resume Game
-          </Button>
-                {isHost() && (
-                  <Button 
-              onClick={handleStartGame}
-              className="w-full bg-blue-600 hover:bg-blue-700"
-            >
-              Restart Game
-                  </Button>
-                )}
-          <Button
-            variant="outline"
-            onClick={handleAddPlayer}
-            className="w-full"
-          >
-            Add Player
-          </Button>
-          <Button
-            variant="destructive"
-            onClick={handleQuit}
-            className="w-full"
-          >
-            Quit Game
-          </Button>
-              </div>
-      </DialogContent>
-    </Dialog>
-  );
-
-  // Main render
+  // Loading state
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin" />
-                    </div>
+      </div>
     );
   }
 
+  // Error state
   if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -878,10 +159,11 @@ const OnlineGamePage = () => {
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>{error}</AlertDescription>
         </Alert>
-                  </div>
+      </div>
     );
   }
 
+  // Room not found state
   if (!room) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -889,44 +171,227 @@ const OnlineGamePage = () => {
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>Game room not found</AlertDescription>
         </Alert>
-                      </div>
+      </div>
     );
   }
 
   return (
     <div className="min-h-screen relative overflow-hidden bg-transparent">
       <Starfield />
-      <div className="container mx-auto max-w-4xl p-4 relative z-10">
-        <div className="flex justify-between items-center mb-6">
-                    <Button 
-            variant="ghost"
+      <div className="container mx-auto max-w-4xl p-4 relative z-10 space-y-6">
+        {/* Header section */}
+        <div className="flex justify-between items-center">
+          <Button 
+            variant="ghost" 
             className="text-gray-400 hover:text-white"
-            onClick={handleQuit}
+            onClick={() => navigate('/')}
           >
             <ArrowLeft className="mr-2 h-4 w-4" />
             Leave Game
-                    </Button>
+          </Button>
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
               <Clock className="h-4 w-4" />
-              <span>{Math.ceil(timeLeft / 1000)}s</span>
+              <span>{timeLeft}s</span>
             </div>
-                    <Button 
+            <Button 
               variant="outline"
               size="icon"
-              onClick={handlePauseToggle}
+              onClick={() => setIsPaused(true)}
               className="h-8 w-8"
             >
               <Pause className="h-4 w-4" />
-                    </Button>
-            </div>
+            </Button>
+          </div>
         </div>
-        {renderGameContent()}
-      </div>
-      
-      {/* Dialogs */}
-      {renderPauseMenu()}
+        
+        {/* Player Info Card */}
+        <Card className="bg-gray-800/50 border-gray-700">
+          <CardHeader>
+            <CardTitle className="flex justify-between items-center">
+              <div className="flex items-center">
+                <div className="w-10 h-10 mr-3">
+                  <img 
+                    src={playerRole === 'civilian' 
+                      ? '/avatars/civilian.png' 
+                      : playerRole === 'undercover' 
+                        ? '/avatars/undercover.png' 
+                        : '/avatars/mrwhite.png'} 
+                    alt={`${playerRole} avatar`}
+                    className="w-full h-full object-contain"
+                  />
+                </div>
+                <span>Your Role: {playerRole}</span>
+              </div>
+              <span className="text-sm bg-blue-600 px-3 py-1 rounded-full">
+                Round {localCurrentRound}
+                      </span>
+            </CardTitle>
+            <CardDescription className="text-lg">
+              {playerRole === 'mrwhite'
+                ? "You are Mr. White - try to figure out the word!"
+                : `Your word is: ${playerWord}`}
+            </CardDescription>
+          </CardHeader>
+        </Card>
+          
+        {/* Game Phase Card */}
+        <Card className="bg-gray-800/50 border-gray-700">
+          <CardHeader>
+            <CardTitle>Game Phase: {localGamePhase}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {localGamePhase === 'description' && (
+              <div className="mb-4">
+                <h3 className="text-sm font-medium mb-2">Describe Your Word</h3>
+                <div className="bg-gray-700/30 rounded-lg p-3 h-40 overflow-y-auto mb-2">
+                  {messages.length === 0 ? (
+                    <p className="text-gray-500 text-center text-sm">No descriptions yet</p>
+                  ) : (
+                    messages.map((msg, index) => (
+                      <div key={index} className="mb-2">
+                        <p className="text-xs">
+                          <span className="font-semibold">{msg.playerName}:</span> {msg.content}
+                        </p>
+                      </div>
+                    ))
+                  )}
+                  <div ref={messagesEndRef} />
+                </div>
+                <form onSubmit={handleDescriptionSubmit} className="flex space-x-2">
+                  <Input
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    placeholder="Type your description..."
+                    className="bg-gray-700 border-gray-600"
+                    disabled={playerRole === 'mrwhite' || currentTurn !== user.id}
+                    ref={descriptionInputRef}
+                  />
+                  <Button 
+                    type="submit" 
+                    size="icon" 
+                    className="bg-blue-600 hover:bg-blue-700"
+                    disabled={playerRole === 'mrwhite' || currentTurn !== user.id || !description.trim()}
+                  >
+                    <Send className="h-4 w-4" />
+                  </Button>
+                </form>
+          </div>
+        )}
+            
+            {localGamePhase === 'discussion' && (
+              <div className="space-y-4">
+                <div className="flex flex-col gap-2">
+                  <Input
+                    placeholder="Type your message..."
+                    value={chatMessage}
+                    onChange={(e) => setChatMessage(e.target.value)}
+                  />
+                  <Button 
+                    className="w-full"
+                    onClick={() => {
+                      if (chatMessage.trim()) {
+                        // Add message handling logic here
+                        setChatMessage('');
+                      }
+                    }}
+                  >
+                    Send Message
+                  </Button>
+                </div>
+                <div className="h-48 overflow-y-auto bg-gray-900/50 rounded-lg p-4">
+                  {messages.map((msg, index) => (
+                    <div key={`${msg.player}-${index}`} className="mb-2">
+                      <span className="font-bold">{msg.player}: </span>
+                      <span>{msg.text}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
+        {/* Players Card */}
+        <Card className="bg-gray-800/50 border-gray-700">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              Players
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {room?.players?.map((player) => (
+                <div
+                  key={`player-${player.id}`}
+                  className={`flex items-center justify-between p-2 rounded-lg ${
+                    currentTurn === player.id ? 'bg-blue-600/30' : 'bg-gray-700/30'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8">
+                      <img
+                        src={player.role === 'civilian' 
+                          ? '/avatars/civilian.png' 
+                          : player.role === 'undercover' 
+                            ? '/avatars/undercover.png' 
+                            : '/avatars/mrwhite.png'}
+                        alt={`${player.role} avatar`}
+                        className="w-full h-full object-contain"
+                      />
+                    </div>
+                    <span>{player.username}</span>
+                  </div>
+                  {currentTurn === player.id && (
+                    <span className="text-sm text-blue-400">Speaking...</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+          </div>
+
+      {/* Dialogs */}
+      <Dialog open={isPaused} onOpenChange={setIsPaused}>
+        <DialogContent className="bg-gray-800 border-gray-700">
+          <DialogHeader>
+            <DialogTitle>Game Paused</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+                    <Button 
+              onClick={() => setIsPaused(false)}
+              className="w-full"
+                    >
+              Resume Game
+                    </Button>
+                  {isHost() && (
+                    <Button 
+                onClick={startGame}
+                className="w-full bg-blue-600 hover:bg-blue-700"
+              >
+                Restart Game
+                    </Button>
+                  )}
+                  <Button 
+              variant="outline"
+              onClick={() => setShowAddPlayerConfirm(true)}
+              className="w-full"
+            >
+              Add Player
+                  </Button>
+                <Button 
+              variant="destructive"
+              onClick={() => setShowQuitConfirm(true)}
+              className="w-full"
+                >
+              Quit Game
+                </Button>
+            </div>
+        </DialogContent>
+      </Dialog>
+      
       <Dialog open={showQuitConfirm} onOpenChange={setShowQuitConfirm}>
         <DialogContent className="bg-gray-800 border-gray-700">
           <DialogHeader>
@@ -936,15 +401,18 @@ const OnlineGamePage = () => {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-                <Button
-                  variant="outline"
+            <Button
+              variant="outline"
               onClick={() => setShowQuitConfirm(false)}
             >
               Cancel
-                </Button>
+            </Button>
             <Button
               variant="destructive"
-              onClick={handleQuitConfirm}
+              onClick={() => {
+                leave();
+                navigate('/');
+              }}
             >
               Quit
             </Button>

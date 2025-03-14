@@ -17,7 +17,7 @@ export default function GamePage() {
   const { gameCode } = useParams();
   const navigate = useNavigate();
   const { isAuthenticated, user, token } = useAuth();
-  const { room, loading, error, fetchRoom, setReady, leave, isHost, isPlayerReady, startGame } = useGameRoom();
+  const { room, loading, error, fetchRoom, setReady, leave, isHost, isPlayerReady, startGame, areAllPlayersReady } = useGameRoom();
   const { toast } = useToast();
   const [initialFetchDone, setInitialFetchDone] = useState(false);
   const [isRedirecting, setIsRedirecting] = useState(false);
@@ -105,6 +105,9 @@ export default function GamePage() {
   // Handle start game (host only)
   const handleStartGame = () => {
     console.log('Start game button clicked');
+    console.log('Room state:', room);
+    console.log('All players ready:', areAllPlayersReady());
+    console.log('Players ready status:', room.players.map(p => ({ name: p.name, isReady: p.isReady })));
     
     // Prevent multiple clicks
     if (isRedirecting) {
@@ -124,7 +127,7 @@ export default function GamePage() {
     }
     
     // Check if all players are ready
-    if (!room.players.every(p => p.isReady)) {
+    if (!areAllPlayersReady()) {
       console.error('All players must be ready to start the game');
       toast({
         title: "Cannot Start Game",
@@ -333,7 +336,7 @@ export default function GamePage() {
                       </Button>
                       <Button
                         onClick={handleStartGame}
-                        disabled={isRedirecting || !room.players.every(p => p.isReady)}
+                        disabled={isRedirecting || !areAllPlayersReady()}
                         className="bg-green-600 hover:bg-green-700"
                       >
                         Start Game

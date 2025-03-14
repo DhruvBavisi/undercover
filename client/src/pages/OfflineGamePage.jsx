@@ -63,7 +63,8 @@ export default function OfflineGamePage() {
           playerCount, 
           settings.includeWhite, 
           selectedWordPair,
-          settings.undercoverCount
+          settings.undercoverCount,
+          settings.mrWhiteCount
         )
         
         setPlayers(initialPlayers)
@@ -251,7 +252,8 @@ export default function OfflineGamePage() {
       players.length,
       gameSettings.includeWhite,
       newWordPair,
-      gameSettings.undercoverCount
+      gameSettings.undercoverCount,
+      gameSettings.mrWhiteCount
     );
 
     // Preserve scores for existing players
@@ -386,8 +388,14 @@ export default function OfflineGamePage() {
         isOpen={isPaused}
         onClose={() => setIsPaused(false)}
         onResume={() => setIsPaused(false)}
-        onRestart={handleRestart}
-        onAddPlayer={handleAddPlayer}
+        onRestart={() => {
+          setIsPaused(false);
+          handleRestart();
+        }}
+        onAddPlayer={() => {
+          setIsPaused(false);
+          handleAddPlayer();
+        }}
         title="Game Paused"
       />
       <Dialog open={showQuitConfirm} onOpenChange={setShowQuitConfirm}>

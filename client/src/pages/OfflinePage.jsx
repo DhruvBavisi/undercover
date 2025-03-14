@@ -30,6 +30,7 @@ import {
   DialogFooter,
 } from "../components/ui/dialog";
 import PauseMenu from "../components/pause-menu";
+import { getRandomWordPair, assignRoles, randomizeSpeakingOrder } from "../utils/game-utils"
 
 export default function OfflinePage() {
   const navigate = useNavigate();
@@ -43,21 +44,7 @@ export default function OfflinePage() {
     if (initialPlayers.length > 0) {
       return initialPlayers.length;
     }
-    
-    // Then check localStorage
-    const storedSettings = localStorage.getItem("offlineGameSettings");
-    if (storedSettings) {
-      try {
-        const settings = JSON.parse(storedSettings);
-        if (settings.playerCount) {
-          return settings.playerCount;
-        }
-      } catch (error) {
-        console.error("Error parsing stored settings:", error);
-      }
-    }
-    
-    return 3; // Default value
+    return 3; // Default value, removed localStorage check to always start with 3 players
   });
   const [includeWhite, setIncludeWhite] = useState(true);
   const [undercoverCount, setUndercoverCount] = useState(1);
@@ -70,21 +57,7 @@ export default function OfflinePage() {
     if (initialPlayers.length > 0) {
       return initialPlayers.map(p => p.name);
     }
-    
-    // Then try localStorage
-    const storedSettings = localStorage.getItem("offlineGameSettings");
-    if (storedSettings) {
-      try {
-        const settings = JSON.parse(storedSettings);
-        if (settings.existingPlayers && settings.existingPlayers.length > 0) {
-          return settings.existingPlayers.map(p => p.name);
-        }
-      } catch (error) {
-        console.error("Error parsing stored settings:", error);
-      }
-    }
-    
-    return Array(3).fill("");
+    return Array(3).fill(""); // Default 3 empty player slots
   });
   const [nameErrors, setNameErrors] = useState(Array(players.length).fill(""));
   const [rounds, setRounds] = useState(playerCount - 2);

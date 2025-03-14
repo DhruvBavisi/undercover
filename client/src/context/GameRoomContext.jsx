@@ -116,6 +116,8 @@ export const GameRoomProvider = ({ children }) => {
     // Listen for player ready status updates
     const handlePlayerReady = (data) => {
       console.log('Player ready status updated:', data);
+      
+      // Update readyPlayers set
       setReadyPlayers(prev => {
         const newSet = new Set(prev);
         if (data.isReady) {
@@ -125,6 +127,25 @@ export const GameRoomProvider = ({ children }) => {
         }
         return newSet;
       });
+      
+      // Also update the player's ready status in the room state
+      if (room && room.players) {
+        setRoom(prevRoom => {
+          if (!prevRoom) return prevRoom;
+          
+          const updatedPlayers = prevRoom.players.map(player => {
+            if (player.userId === data.userId) {
+              return { ...player, isReady: data.isReady };
+            }
+            return player;
+          });
+          
+          return {
+            ...prevRoom,
+            players: updatedPlayers
+          };
+        });
+      }
     };
     
     // Listen for game start
@@ -134,8 +155,13 @@ export const GameRoomProvider = ({ children }) => {
       // Immediately update room state
       setRoom(prev => ({
         ...prev,
-        ...gameData
+        ...gameData,
+        rounds: gameData.rounds || prev?.rounds || []
       }));
+      
+      // Set current round and phase
+      setCurrentRound(gameData.currentRound || 1);
+      setGamePhase(gameData.currentPhase || 'discussion');
       
       // Handle navigation to game page
       if (gameData.status === 'in-progress' && !isRedirectingRef.current) {
@@ -347,6 +373,23 @@ export const GameRoomProvider = ({ children }) => {
         return newSet;
       });
       
+      // Also update the player's ready status in the local room state immediately
+      setRoom(prevRoom => {
+        if (!prevRoom) return prevRoom;
+        
+        const updatedPlayers = prevRoom.players.map(player => {
+          if (player.userId === user.id) {
+            return { ...player, isReady: isReady };
+          }
+          return player;
+        });
+        
+        return {
+          ...prevRoom,
+          players: updatedPlayers
+        };
+      });
+      
       // Emit socket event for real-time updates to other players
       socket.emit('player-ready', {
         roomCode: room.roomCode,
@@ -380,6 +423,23 @@ export const GameRoomProvider = ({ children }) => {
           }
           return newSet;
         });
+        
+        // Revert local room state on failure
+        setRoom(prevRoom => {
+          if (!prevRoom) return prevRoom;
+          
+          const updatedPlayers = prevRoom.players.map(player => {
+            if (player.userId === user.id) {
+              return { ...player, isReady: !isReady };
+            }
+            return player;
+          });
+          
+          return {
+            ...prevRoom,
+            players: updatedPlayers
+          };
+        });
       }
     } catch (err) {
       console.error('Error updating ready status:', err);
@@ -394,6 +454,23 @@ export const GameRoomProvider = ({ children }) => {
           newSet.add(user.id);
         }
         return newSet;
+      });
+      
+      // Revert local room state on error
+      setRoom(prevRoom => {
+        if (!prevRoom) return prevRoom;
+        
+        const updatedPlayers = prevRoom.players.map(player => {
+          if (player.userId === user.id) {
+            return { ...player, isReady: !isReady };
+          }
+          return player;
+        });
+        
+        return {
+          ...prevRoom,
+          players: updatedPlayers
+        };
       });
     } finally {
       setLoading(false);
@@ -481,8 +558,9 @@ export const GameRoomProvider = ({ children }) => {
         
         // Emit game start event
         if (socket) {
-          socket.emit('game-start', {
-            gameCode: room.roomCode
+          socket.emit('start-game', {
+            roomCode: room.roomCode,
+            userId: user.id
           });
         }
         
@@ -508,7 +586,7 @@ export const GameRoomProvider = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  }, [room, isHost, token, socket, navigate]);
+  }, [room, isHost, token, socket, navigate, user]);
   
   // Check if the current user is ready
   const isPlayerReady = () => {
@@ -549,8 +627,44 @@ export const GameRoomProvider = ({ children }) => {
     isPlayerReady,
     resetState,
     areAllPlayersReady: () => {
-      if (!room || !room.players) return false;
-      return room.players.every(player => readyPlayers.has(player.userId));
+      if (!room || !room.players || room.players.length === 0) return false;
+      return room.players.every(player => player.isReady);
+    },
+    submitWordDescription: (description) => {
+      if (!room || !socket || !user) return;
+      
+      console.log(`Submitting word description: ${description}`);
+      
+      // Emit socket event
+      socket.emit('submit-description', {
+        gameCode: room.roomCode,
+        playerId: user.id,
+        description
+      });
+    },
+    submitVote: (votedForId) => {
+      if (!room || !socket || !user) return;
+      
+      console.log(`Submitting vote for player: ${votedForId}`);
+      
+      // Emit socket event
+      socket.emit('submit-vote', {
+        gameCode: room.roomCode,
+        voterId: user.id,
+        votedForId
+      });
+    },
+    submitWordGuess: (word) => {
+      if (!room || !socket || !user) return;
+      
+      console.log(`Submitting word guess: ${word}`);
+      
+      // Emit socket event
+      socket.emit('mr-white-guess', {
+        gameCode: room.roomCode,
+        playerId: user.id,
+        word
+      });
     }
   };
   

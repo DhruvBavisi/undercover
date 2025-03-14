@@ -13,7 +13,6 @@ export function getRandomWordPair(category = 'general') {
   // If all word pairs have been used, reset the tracking
   if (usedWordPairs.size >= wordPairsData.length) {
     usedWordPairs.clear();
-    console.log('All word pairs have been used, resetting tracking');
   }
 
   // Filter out word pairs that have already been used
@@ -37,7 +36,6 @@ export function getRandomWordPair(category = 'general') {
  */
 export function resetUsedWordPairs() {
   usedWordPairs.clear();
-  console.log('Word pair tracking has been reset');
 }
 
 /**
@@ -193,9 +191,14 @@ export function assignRoles(playerNames, playerCount, includeWhite = true, wordP
   const maxMrWhite = getMaxMrWhite(playerCount);
   const minCivilians = getMinCivilians(playerCount);
 
-  // Validate role counts
-  const actualUndercoverCount = Math.min(maxUndercover, undercoverCount);
-  const mrWhiteCount = includeWhite ? Math.min(maxMrWhite, requestedMrWhiteCount) : 0;
+  // IMPORTANT: Ensure we have at least 1 special role in total
+  // If both requested counts are 0, force undercover to 1
+  let actualUndercoverCount = Math.min(maxUndercover, undercoverCount);
+  let mrWhiteCount = includeWhite ? Math.min(maxMrWhite, requestedMrWhiteCount) : 0;
+  
+  if (actualUndercoverCount === 0 && mrWhiteCount === 0) {
+    actualUndercoverCount = 1; // Always ensure at least one special role
+  }
 
   // Ensure we don't exceed the maximum special roles
   const totalSpecialRoles = actualUndercoverCount + mrWhiteCount;
@@ -205,12 +208,27 @@ export function assignRoles(playerNames, playerCount, includeWhite = true, wordP
   let finalUndercoverCount = actualUndercoverCount;
   
   if (totalSpecialRoles > maxSpecialRoles) {
+    // Store original Mr. White count before reduction
+    const originalMrWhiteCount = finalMrWhiteCount;
+    
     // Reduce Mr. White count first if needed
     finalMrWhiteCount = Math.max(0, maxSpecialRoles - actualUndercoverCount);
+    
+    // If Mr. White was reduced to 0 and there were no undercover agents,
+    // we need to ensure at least one special role by adding an undercover
+    if (originalMrWhiteCount > 0 && finalMrWhiteCount === 0 && finalUndercoverCount === 0) {
+      finalUndercoverCount = 1;
+    }
+    
     // If still too many special roles, reduce undercover count
     if (finalMrWhiteCount === 0 && finalUndercoverCount > maxSpecialRoles) {
       finalUndercoverCount = maxSpecialRoles;
     }
+  }
+
+  // Final safety check: Ensure we have at least 1 special role in total
+  if (finalMrWhiteCount + finalUndercoverCount < 1) {
+    finalUndercoverCount = 1; // Force at least one undercover
   }
 
   // Create array of all player indices and shuffle for role assignment

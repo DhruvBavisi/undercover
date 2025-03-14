@@ -40,8 +40,8 @@ export default function OfflineGameOver({
   onAddPlayer,
   onQuit,
 }) {
-  const [showAddPlayerDialog, setShowAddPlayerDialog] = useState(false);
   const [showPauseMenu, setShowPauseMenu] = useState(false);
+  const [showAddPlayerDialog, setShowAddPlayerDialog] = useState(false);
   const navigate = useNavigate();
 
   // Determine the winning team based on remaining players and Mr. White guess
@@ -103,14 +103,18 @@ export default function OfflineGameOver({
     setShowAddPlayerDialog(true);
   };
 
-  const [newPlayerName, setNewPlayerName] = useState("");
+  const confirmAddPlayer = () => {
+    setShowAddPlayerDialog(false);
+    navigate('/offline', { 
+      state: { 
+        players: players,
+        fromGame: true
+      } 
+    });
+  };
 
-  const handleAddNewPlayer = () => {
-    if (newPlayerName.trim()) {
-      onAddPlayer(newPlayerName.trim());
-      setNewPlayerName("");
-      setShowAddPlayerDialog(false);
-    }
+  const cancelAddPlayer = () => {
+    setShowAddPlayerDialog(false);
   };
 
   const handleQuit = (event) => {
@@ -288,41 +292,27 @@ export default function OfflineGameOver({
         onRestart={onRestart}
         onAddPlayer={() => {
           setShowPauseMenu(false);
-          // Navigate to setup page with current players
-          navigate('/offline', { 
-            state: { 
-              players: players,
-              fromGame: true
-            } 
-          });
+          handleAddPlayers();
         }}
         title="Game Over Menu"
       />
 
       <Dialog open={showAddPlayerDialog} onOpenChange={setShowAddPlayerDialog}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="bg-gray-800 text-white">
           <DialogHeader>
             <DialogTitle>Add New Player</DialogTitle>
-            <DialogDescription>
-              Enter the name of the player you want to add to the game.
+            <DialogDescription className="text-gray-400">
+              Adding a new player will take you to the setup page. Continue?
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <Input
-              placeholder="Player name"
-              value={newPlayerName}
-              onChange={(e) => setNewPlayerName(e.target.value)}
-              className="w-full"
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddPlayerDialog(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleAddNewPlayer}>
+          <div className="grid gap-4 py-4">
+            <Button onClick={confirmAddPlayer} className="bg-green-600 hover:bg-green-700">
               Add Player
             </Button>
-          </DialogFooter>
+            <Button onClick={cancelAddPlayer} variant="outline">
+              Cancel
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

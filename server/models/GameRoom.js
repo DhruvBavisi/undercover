@@ -87,6 +87,21 @@ const gameRoomSchema = new mongoose.Schema({
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User'
     },
+    speakingOrder: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    }],
+    descriptions: [{
+      playerId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+      },
+      description: String,
+      timestamp: {
+        type: Date,
+        default: Date.now
+      }
+    }],
     votes: [{
       voterId: {
         type: mongoose.Schema.Types.ObjectId,
@@ -221,40 +236,66 @@ gameRoomSchema.methods.startGame = function() {
   let assignedUndercovers = 0;
   let assignedMrWhites = 0;
   
-  shuffledPlayers.forEach((player) => {
-    // Reset player state
+  // Reset player roles and words
+  this.players.forEach(player => {
+    player.role = '';
+    player.word = '';
     player.isEliminated = false;
+  });
+  
+  // Assign roles to shuffled players
+  shuffledPlayers.forEach((player, index) => {
+    // Find the actual player in the game room
+    const actualPlayer = this.players.find(p => p.userId.toString() === player.userId.toString());
+    if (!actualPlayer) return;
     
     if (assignedMrWhites < numMrWhites) {
-      // Assign Mr. White roles first
-      player.role = 'mrwhite';
-      player.word = '';
+      // Assign Mr. White role
+      actualPlayer.role = 'mrwhite';
+      actualPlayer.word = '';  // Mr. White doesn't know the word
       assignedMrWhites++;
     } else if (assignedUndercovers < numUndercovers) {
-      // Next assign undercover roles
-      player.role = 'undercover';
-      player.word = undercover;
+      // Assign Undercover role
+      actualPlayer.role = 'undercover';
+      actualPlayer.word = undercover;
       assignedUndercovers++;
     } else {
-      // Remaining players are civilians
-      player.role = 'civilian';
-      player.word = civilian;
+      // Assign Civilian role
+      actualPlayer.role = 'civilian';
+      actualPlayer.word = civilian;
     }
   });
-
-  // Update players array with new roles
-  this.players = shuffledPlayers;
-
-  // Set first player's turn
-  const firstPlayer = this.players.find(p => !p.isEliminated);
-  if (firstPlayer) {
-    this.rounds.push({
-      roundNumber: 1,
-      playerTurn: firstPlayer.userId,
-      votes: [],
-      eliminatedPlayer: null
-    });
+  
+  // Generate speaking order for the descriptive phase
+  // Ensure Mr. White is never first in the first round
+  const activePlayers = this.players.filter(p => !p.isEliminated);
+  let speakingOrder = activePlayers.map(p => p.userId);
+  
+  // Shuffle the speaking order
+  speakingOrder = speakingOrder.sort(() => Math.random() - 0.5);
+  
+  // If it's the first round and Mr. White is first, swap positions
+  if (this.currentRound === 1) {
+    const mrWhiteIndex = activePlayers.findIndex(p => p.role === 'mrwhite');
+    if (mrWhiteIndex === 0 && speakingOrder.length > 1) {
+      // Swap with a random position that's not the first
+      const swapIndex = Math.floor(Math.random() * (speakingOrder.length - 1)) + 1;
+      [speakingOrder[0], speakingOrder[swapIndex]] = [speakingOrder[swapIndex], speakingOrder[0]];
+    }
   }
+  
+  // Initialize first round
+  const firstPlayer = this.players.find(p => p.userId.toString() === speakingOrder[0].toString());
+  this.rounds.push({
+    roundNumber: 1,
+    playerTurn: firstPlayer.userId,
+    speakingOrder: speakingOrder,
+    descriptions: [],
+    votes: [],
+    eliminatedPlayer: null
+  });
+  
+  return this;
 };
 
 // Update the checkWinCondition method to handle Mr. White
