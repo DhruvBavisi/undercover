@@ -79,6 +79,13 @@ const OnlineGamePage = () => {
   const handleDescriptionSubmit = async (e) => {
     e.preventDefault();
     
+    // Add a console log to debug the current turn state
+    console.log('Current turn check:', { 
+      currentTurn, 
+      userId: user.id, 
+      isCurrentTurn: currentTurn === user.id 
+    });
+    
     if (!description.trim() || playerRole === 'mrwhite' || currentTurn !== user.id) {
       return;
     }
@@ -87,14 +94,8 @@ const OnlineGamePage = () => {
       setIsProcessing(true);
       await submitWordDescription(description.trim());
       
-      // Add message to local state
-      setMessages(prev => [...prev, {
-        id: Date.now(),
-        playerName: user.username,
-        userId: user.id,
-        content: description.trim(),
-        isDescription: true
-      }]);
+      // Don't add message to local state here
+      // The socket event handler will add it when received from server
       
       // Clear input
       setDescription('');
@@ -104,10 +105,6 @@ const OnlineGamePage = () => {
         descriptionInputRef.current.focus();
       }
       
-      // Scroll to bottom
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
     } catch (error) {
       console.error('Error submitting description:', error);
       toast({
@@ -143,14 +140,61 @@ const OnlineGamePage = () => {
       setCurrentTurn(data.speakingOrder[0]);
     };
     
+    // Listen for description submissions from other players
+    const handleDescriptionSubmitted = (data) => {
+      console.log('Description submitted:', data);
+      
+      // Add the description to messages
+      setMessages(prev => [...prev, {
+        id: Date.now(),
+        playerName: data.playerName,
+        userId: data.playerId,
+        content: data.description,
+        isDescription: true
+      }]);
+      
+      // Scroll to bottom
+      if (messagesEndRef.current) {
+        messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+      }
+    };
+    
+    // Listen for turn changes
+    const handleNextTurn = (data) => {
+      console.log('Next turn:', data.playerId);
+      // Ensure we're updating the state with the correct player ID
+      if (data.playerId) {
+        setCurrentTurn(data.playerId);
+        console.log('Current turn updated to:', data.playerId);
+      } else {
+        console.error('Next turn event received with invalid playerId:', data);
+      }
+    };
+    
+    // Listen for turn skips
+    const handleTurnSkipped = (data) => {
+      console.log('Turn skipped:', data.playerName);
+      toast({
+        title: "Turn Skipped",
+        description: `${data.playerName}'s turn was skipped due to time limit.`,
+        variant: "default"
+      });
+    };
+    
     // Set up listeners
     socket.on('receive-message', handleChatMessage);
     socket.on('speaking-order-updated', handleSpeakingOrderUpdate);
+    socket.on('description-submitted', handleDescriptionSubmitted);
+    socket.on('next-turn', handleNextTurn);
+    socket.on('turn-skipped', handleTurnSkipped);
     
     // Clean up listeners
     return () => {
       socket.off('receive-message', handleChatMessage);
       socket.off('speaking-order-updated', handleSpeakingOrderUpdate);
+      socket.off('description-submitted', handleDescriptionSubmitted);
+      socket.off('next-turn', handleNextTurn);
+      socket.off('turn-skipped', handleTurnSkipped);
     };
   }, [room]);
 
@@ -178,13 +222,23 @@ const OnlineGamePage = () => {
     if (room?.currentRound) {
       setLocalCurrentRound(room.currentRound);
     }
+    
+    // Check if room has playerTurn directly or in the current round
     if (room?.playerTurn) {
+      console.log('Setting current turn from room.playerTurn:', room.playerTurn);
       setCurrentTurn(room.playerTurn);
+    } else if (room?.rounds && room.rounds.length > 0 && room.currentRound > 0) {
+      const currentRoundData = room.rounds[room.currentRound - 1];
+      if (currentRoundData && currentRoundData.playerTurn) {
+        console.log('Setting current turn from room.rounds:', currentRoundData.playerTurn);
+        setCurrentTurn(currentRoundData.playerTurn);
+      }
     }
+    
     if (room?.speakingOrder) {
       setSpeakingOrder(room.speakingOrder);
     }
-  }, [room?.gamePhase, room?.currentRound, room?.playerTurn, room?.speakingOrder]);
+  }, [room?.gamePhase, room?.currentRound, room?.playerTurn, room?.speakingOrder, room?.rounds]);
 
   // Add a function to start the game with pointer at first player
   const handleStartGame = async () => {
@@ -430,9 +484,9 @@ const OnlineGamePage = () => {
                         messages.filter(msg => msg.isDescription).map((msg, index) => {
                           const player = room.players.find(p => p.userId === msg.userId);
                           return (
-                            <div key={index} className="mb-2 p-2 bg-gray-700/50 rounded">
+                            <div key={index} className="mb-2 p-2 bg-gray-700/50 rounded-lg">
                               <div className="flex items-start gap-2">
-                                <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0">
+                                <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 bg-gray-600 flex items-center justify-center">
                                   <img 
                                     src={player?.avatarId 
                                       ? `/avatars/character${player.avatarId}.png` 
@@ -442,8 +496,8 @@ const OnlineGamePage = () => {
                                   />
                                 </div>
                                 <div>
-                                  <p className="text-sm font-medium">{msg.playerName}</p>
-                                  <p>{msg.content}</p>
+                                  <p className="text-xs font-medium text-indigo-300">{msg.playerName}</p>
+                                  <p className="text-sm">{msg.content}</p>
                                 </div>
                               </div>
                             </div>
@@ -477,11 +531,11 @@ const OnlineGamePage = () => {
                       {messages.filter(msg => !msg.isDescription).map((msg, index) => (
                         <div 
                           key={index} 
-                          className={`mb-2 p-2 rounded ${msg.userId === user.id ? 'ml-auto bg-blue-600/50 max-w-[80%]' : 'mr-auto bg-gray-700/50 max-w-[80%]'}`}
+                          className={`mb-2 p-2 rounded-lg ${msg.userId === user.id ? 'ml-auto bg-indigo-600/40 max-w-[80%]' : 'mr-auto bg-gray-700/60 max-w-[80%]'}`}
                         >
                           <div className="flex items-start gap-2">
                             {msg.userId !== user.id && (
-                              <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0">
+                              <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 bg-gray-600 flex items-center justify-center">
                                 <img 
                                   src={room.players.find(p => p.userId === msg.userId)?.avatarId 
                                     ? `/avatars/character${room.players.find(p => p.userId === msg.userId).avatarId}.png` 
@@ -491,12 +545,12 @@ const OnlineGamePage = () => {
                                 />
                               </div>
                             )}
-                            <div>
-                              <p className="text-sm font-medium">{msg.playerName}</p>
-                              <p>{msg.content}</p>
+                            <div className="flex-1">
+                              <p className="text-xs font-medium text-gray-300">{msg.playerName}</p>
+                              <p className="text-sm">{msg.content}</p>
                             </div>
                             {msg.userId === user.id && (
-                              <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 ml-auto">
+                              <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 bg-indigo-600 flex items-center justify-center ml-auto">
                                 <img 
                                   src={room.players.find(p => p.userId === msg.userId)?.avatarId 
                                     ? `/avatars/character${room.players.find(p => p.userId === msg.userId).avatarId}.png` 
@@ -520,7 +574,7 @@ const OnlineGamePage = () => {
                       />
                       <Button 
                         size="icon" 
-                        className="bg-blue-600 hover:bg-blue-700"
+                        className="bg-indigo-600 hover:bg-indigo-700"
                         onClick={() => {
                           if (chatMessage.trim()) {
                             // Get socket from context

@@ -213,6 +213,20 @@ export const GameRoomProvider = ({ children }) => {
     // Listen for errors
     const handleError = (errorData) => {
       console.error('Socket error:', errorData);
+      // Add more detailed logging for the 'Not your turn' error
+      if (errorData.message === 'Not your turn') {
+        console.log('Turn validation failed. Current state:', {
+          currentPhase: gamePhase,
+          currentRound,
+          userId: user?.id,
+          room: room ? {
+            roomCode: room.roomCode,
+            currentPhase: room.currentPhase,
+            currentRound: room.currentRound,
+            playerTurn: room.playerTurn
+          } : null
+        });
+      }
       setError(errorData.message);
       setTimeout(() => setError(null), 3000);
     };
@@ -634,6 +648,17 @@ export const GameRoomProvider = ({ children }) => {
       if (!room || !socket || !user) return;
       
       console.log(`Submitting word description: ${description}`);
+      console.log('Current game state before submission:', {
+        roomCode: room.roomCode,
+        userId: user.id,
+        currentPhase: room.currentPhase,
+        currentRound: room.currentRound,
+        // Check if the current round exists in the room data
+        currentRoundData: room.rounds && room.rounds[room.currentRound - 1] ? {
+          playerTurn: room.rounds[room.currentRound - 1].playerTurn,
+          speakingOrder: room.rounds[room.currentRound - 1].speakingOrder
+        } : 'No current round data'
+      });
       
       // Emit socket event
       socket.emit('submit-description', {
@@ -673,4 +698,4 @@ export const GameRoomProvider = ({ children }) => {
       {children}
     </GameRoomContext.Provider>
   );
-}; 
+};

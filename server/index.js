@@ -648,7 +648,7 @@ io.on('connection', (socket) => {
       }
       
       // Check if it's the descriptive phase
-      if (gameRoom.currentPhase !== 'discussion') {
+      if (gameRoom.currentPhase !== 'description' && gameRoom.currentPhase !== 'discussion') {
         socket.emit('error', { message: 'Not in the descriptive phase' });
         return;
       }
@@ -806,7 +806,7 @@ io.on('connection', (socket) => {
       }
       
       // Check if it's the descriptive phase
-      if (gameRoom.currentPhase !== 'discussion') {
+      if (gameRoom.currentPhase !== 'description' && gameRoom.currentPhase !== 'discussion') {
         socket.emit('error', { message: 'Not in the descriptive phase' });
         return;
       }
