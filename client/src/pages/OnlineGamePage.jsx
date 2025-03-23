@@ -116,7 +116,7 @@ const OnlineGamePage = () => {
       setIsProcessing(false);
     }
   };
-  
+
   // Set up socket listeners for game events
   useEffect(() => {
     const socket = window.socket;

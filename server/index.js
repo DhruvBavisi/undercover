@@ -640,58 +640,25 @@ io.on('connection', (socket) => {
     const { gameCode, playerId, description } = data;
     
     try {
-      // Find the game room
       const gameRoom = await GameRoom.findOne({ roomCode: gameCode });
       if (!gameRoom) {
         socket.emit('error', { message: 'Game room not found' });
         return;
       }
-      
-      // Check if it's the descriptive phase
-      if (gameRoom.currentPhase !== 'description' && gameRoom.currentPhase !== 'discussion') {
-        socket.emit('error', { message: 'Not in the descriptive phase' });
-        return;
-      }
-      
-      // Get the current round
+
       const currentRound = gameRoom.rounds[gameRoom.currentRound - 1];
       if (!currentRound) {
         socket.emit('error', { message: 'Invalid round' });
         return;
       }
-      
-      // Check if it's the player's turn
+
+      // Validate current turn
       if (currentRound.playerTurn.toString() !== playerId) {
         socket.emit('error', { message: 'Not your turn' });
         return;
       }
-      
-      // Get the player
-      const player = gameRoom.players.find(p => p.userId.toString() === playerId);
-      if (!player) {
-        socket.emit('error', { message: 'Player not found' });
-        return;
-      }
-      
-      // Check if the description is valid (at least one word)
-      if (!description.trim()) {
-        socket.emit('error', { message: 'Description cannot be empty' });
-        return;
-      }
-      
-      // Check if the description has been used before in this game
-      const isDescriptionUsed = gameRoom.rounds.some(round => 
-        round.descriptions && round.descriptions.some(desc => 
-          desc.description.toLowerCase() === description.toLowerCase()
-        )
-      );
-      
-      if (isDescriptionUsed) {
-        socket.emit('error', { message: 'This description has already been used' });
-        return;
-      }
-      
-      // Add the description to the round
+
+      // Add description
       if (!currentRound.descriptions) {
         currentRound.descriptions = [];
       }
@@ -700,93 +667,37 @@ io.on('connection', (socket) => {
         playerId,
         description
       });
-      
-      // Move to the next player in the speaking order
+
+      // Move to next player
       const speakingOrder = currentRound.speakingOrder || [];
       const currentIndex = speakingOrder.indexOf(playerId);
       
       if (currentIndex >= 0 && currentIndex < speakingOrder.length - 1) {
         // Move to next player
-        currentRound.playerTurn = speakingOrder[currentIndex + 1];
+        const nextPlayerId = speakingOrder[currentIndex + 1];
+        currentRound.playerTurn = nextPlayerId;
+        await gameRoom.save();
+
+        // Emit events
+        io.to(gameCode).emit('description-submitted', {
+          playerId,
+          playerName: gameRoom.players.find(p => p.userId.toString() === playerId)?.name,
+          description
+        });
+
+        io.to(gameCode).emit('next-turn', {
+          playerId: nextPlayerId
+        });
       } else {
         // Last player, move to discussion phase
         gameRoom.currentPhase = 'discussion';
-      }
-      
-      await gameRoom.save();
-      
-      // Clear any existing turn timeout
-      if (gameTimeouts[gameCode] && gameTimeouts[gameCode].turnTimeout) {
-        clearTimeout(gameTimeouts[gameCode].turnTimeout);
-      }
-      
-      // Emit the description to all clients
-      io.to(gameCode).emit('description-submitted', {
-        playerId,
-        playerName: player.name,
-        description
-      });
-      
-      // If not the last player, start a new timer for the next player
-      if (currentIndex < speakingOrder.length - 1) {
-        const turnDuration = gameRoom.settings.roundTime || 60;
-        const turnTimeout = setTimeout(async () => {
-          // Time's up for the next player
-          const updatedRoom = await GameRoom.findOne({ roomCode: gameCode });
-          if (!updatedRoom || updatedRoom.currentPhase !== 'discussion') {
-            return; // Game has moved on, no need to skip
-          }
-          
-          const currentRound = updatedRoom.rounds[updatedRoom.currentRound - 1];
-          if (!currentRound) return;
-          
-          const currentPlayerId = currentRound.playerTurn;
-          const currentPlayer = updatedRoom.players.find(p => p.userId.toString() === currentPlayerId);
-          
-          if (currentPlayer) {
-            // Skip the player's turn
-            io.to(gameCode).emit('turn-skipped', {
-              playerId: currentPlayerId,
-              playerName: currentPlayer.name
-            });
-            
-            // Move to the next player
-            const speakingOrder = currentRound.speakingOrder || [];
-            const currentIndex = speakingOrder.indexOf(currentPlayerId);
-            
-            if (currentIndex >= 0 && currentIndex < speakingOrder.length - 1) {
-              // Move to next player
-              currentRound.playerTurn = speakingOrder[currentIndex + 1];
-              await updatedRoom.save();
-              
-              // Emit next turn
-              io.to(gameCode).emit('next-turn', {
-                playerId: currentRound.playerTurn
-              });
-            } else {
-              // Last player, move to discussion phase
-              updatedRoom.currentPhase = 'discussion';
-              await updatedRoom.save();
-              
-              // Emit phase change
-              io.to(gameCode).emit('phase-change', {
-                phase: 'discussion'
-              });
-            }
-          }
-        }, turnDuration * 1000);
-        
-        // Store the timeout in a map to clear it if needed
-        if (!gameTimeouts[gameCode]) {
-          gameTimeouts[gameCode] = {};
-        }
-        gameTimeouts[gameCode].turnTimeout = turnTimeout;
-      } else {
-        // Last player, emit phase change
+        await gameRoom.save();
+
         io.to(gameCode).emit('phase-change', {
           phase: 'discussion'
         });
       }
+
     } catch (error) {
       console.error('Error submitting description:', error);
       socket.emit('error', { message: 'Failed to submit description' });
