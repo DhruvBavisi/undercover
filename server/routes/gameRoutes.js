@@ -1,5 +1,5 @@
 import express from 'express';
-import Game from '../models/Game.js';
+import { Game } from '../src/game.js'; // Updated import path for Game model
 import { getRandomWordPair, getCategories } from '../utils/wordPairManager.js';
 import GameRoom from '../models/GameRoom.js';
 import User from '../models/User.js';

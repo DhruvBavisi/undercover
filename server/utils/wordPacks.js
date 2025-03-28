@@ -1,6 +1,8 @@
 // Word packs for the game
 // Each pack contains pairs of related words (civilian word, undercover word)
 
+import { Game } from '../src/game.js'; // Updated import path for Game model
+
 const wordPacks = {
   standard: [
     ['Cat', 'Dog'],
@@ -114,4 +116,4 @@ export const getWordPackNames = () => {
   return Object.keys(wordPacks);
 };
 
-export { wordPacks }; 
+export { wordPacks };

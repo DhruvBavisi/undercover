@@ -3,6 +3,7 @@ import GameRoom from '../models/GameRoom.js';
 import User from '../models/User.js';
 import { getRandomWordPair, getWordPackNames } from '../utils/wordPacks.js';
 import { authenticateToken as auth } from '../middleware/auth.js';
+import { Game } from '../src/game.js'; // Updated import path for Game model
 
 const router = express.Router();
 
@@ -553,4 +554,4 @@ router.post('/rooms/:roomCode/start', auth, async (req, res) => {
   }
 });
 
-export default router; 
+export default router;
