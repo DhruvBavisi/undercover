@@ -63,6 +63,7 @@ export default function OfflineElimination({ player, civilianWord, onWhiteGuess,
                 className="absolute left-4 top-1/2 -translate-y-1/2 bg-gray-500/10 hover:bg-gray-700/50 flex items-center gap-1 pl-2 pr-3 text-gray-400 hover:text-white"
               >
                 <ArrowLeft className="h-4 w-4" />
+                Back
               </Button>
             )}
             <CardTitle className="text-2xl">Player Eliminated</CardTitle>

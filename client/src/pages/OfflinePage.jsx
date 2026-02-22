@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Link } from "react-router-dom";
 import { Button } from "../components/ui/button";
@@ -160,7 +161,7 @@ function SortablePlayerRow({ id, index, value, error, onChange, onBlur, onRemove
 }
 
     // Sortable Row for Load Group Dialog
-    function SortableDialogRow({ id, name, index, onRemove }) {
+    function SortableDialogRow({ id, name, index, onRemove, style: customStyle }) {
         const {
         attributes,
         listeners,
@@ -176,12 +177,14 @@ function SortablePlayerRow({ id, index, value, error, onChange, onBlur, onRemove
         zIndex: isDragging ? 50 : "auto",
         position: "relative",
         opacity: isDragging ? 0.5 : 1, // Visual feedback during drag
+        ...customStyle,
         };
     
         return (
         <div 
             ref={setNodeRef} 
             style={style} 
+            data-player-name={name}
             className={`flex items-center gap-3 bg-gray-800 p-3 rounded-md border mb-2 select-none transition-colors group ${
                 isDragging ? 'shadow-lg ring-2 ring-purple-500 border-purple-500' : 'border-gray-700 hover:border-gray-500'
             }`}
@@ -257,7 +260,10 @@ export default function OfflinePage() {
   const [expandedGroup, setExpandedGroup] = useState(null);
   const [selectedGroupPlayers, setSelectedGroupPlayers] = useState([]); // List of checked players from left panel
   const [announcement, setAnnouncement] = useState(""); // ARIA announcement state
-  
+  const [animatingPlayers, setAnimatingPlayers] = useState({}); // Track animating players
+  const playerRefs = useRef({}); // Store refs for saved group player items
+  const selectedListRef = useRef(null); // Ref for the selected players list container
+
   // Startup Dialog State
   // Removed as per user request to remove auto-saved game dialog
 
@@ -401,6 +407,91 @@ export default function OfflinePage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Run only once on mount
+
+  // Effect to handle animation measurements for player transitions
+  useEffect(() => {
+    const measuringPlayers = Object.entries(animatingPlayers)
+      .filter(([_, data]) => data.status === 'measuring');
+
+    if (measuringPlayers.length > 0) {
+      // Use requestAnimationFrame to ensure DOM has updated
+      requestAnimationFrame(() => {
+        const updates = {};
+        let hasUpdates = false;
+        let shouldRemove = [];
+
+        measuringPlayers.forEach(([name, data]) => {
+          let targetEl = null;
+
+          if (data.direction === 'removing') {
+            // If removing, we look for the element in the group list
+            // We can try to use the ref if we have the group name
+            if (data.groupName) {
+                targetEl = playerRefs.current[`${data.groupName}-${name}`];
+            }
+            // Fallback to query selector if ref is missing (though ref is preferred)
+            if (!targetEl) {
+                // Since we added data-player-name to group items too, we need to be careful.
+                // But since the item was removed from Selected List, the only one remaining with this name
+                // should be the one in the Group List.
+                targetEl = document.querySelector(`[data-player-name="${name}"]`);
+            }
+          } else {
+             // If adding, we look for the element in the selected list
+             // The item in the group list is gone, so the only one is in the selected list.
+             targetEl = document.querySelector(`[data-player-name="${name}"]`);
+          }
+
+          if (targetEl) {
+            const rect = targetEl.getBoundingClientRect();
+            updates[name] = {
+              ...data,
+              targetRect: {
+                top: rect.top,
+                left: rect.left,
+                width: rect.width,
+                height: rect.height
+              },
+              status: 'animating'
+            };
+            hasUpdates = true;
+          } else if (data.direction === 'removing') {
+              // If target not found when removing (e.g. group collapsed), just fade out
+              // We can set a dummy target or just animate to disappear
+              // For now, let's just clear it to avoid stuck state
+              const groupHeader = document.querySelector(`[data-group-header="${data.groupName}"]`);
+              if (groupHeader) {
+                  const rect = groupHeader.getBoundingClientRect();
+                  updates[name] = {
+                      ...data,
+                      targetRect: { top: rect.top, left: rect.left, width: rect.width, height: rect.height },
+                      status: 'animating'
+                  };
+                  hasUpdates = true;
+              } else {
+                  // Just finish
+                  shouldRemove.push(name);
+              }
+          }
+        });
+
+        if (hasUpdates) {
+          setAnimatingPlayers(prev => ({
+            ...prev,
+            ...updates
+          }));
+        }
+        
+        if (shouldRemove.length > 0) {
+            setAnimatingPlayers(prev => {
+                const newState = { ...prev };
+                shouldRemove.forEach(n => delete newState[n]);
+                return newState;
+            });
+        }
+      });
+    }
+  }, [selectedGroupPlayers, animatingPlayers]);
 
   // Calculate role limits
   // Used to be defined here, now imported from utils/roleDistribution.js
@@ -742,13 +833,88 @@ export default function OfflinePage() {
       }
   };
 
-  const handleMovePlayerToSelected = (playerName) => {
-      const newPlayer = { id: generateId(), name: playerName };
-      setSelectedGroupPlayers(prev => [...prev, newPlayer]);
-      setAnnouncement(`${playerName} added to selected players`);
+  const handleMovePlayerToSelected = (playerName, groupName) => {
+    // Check if player is already selected to prevent duplicates
+    if (selectedGroupPlayers.some(p => p.name === playerName)) return;
+
+    // Get the source element position
+    const sourceKey = `${groupName}-${playerName}`;
+    const sourceEl = playerRefs.current[sourceKey];
+    
+    if (sourceEl) {
+      const sourceRect = sourceEl.getBoundingClientRect();
+      
+      // Set initial state - measuring phase
+      setAnimatingPlayers(prev => ({
+        ...prev,
+        [playerName]: {
+          sourceRect: {
+            top: sourceRect.top,
+            left: sourceRect.left,
+            width: sourceRect.width,
+            height: sourceRect.height
+          },
+          targetRect: null,
+          status: 'measuring',
+          targetIndex: selectedGroupPlayers.length // Store the index for display
+        }
+      }));
+    }
+
+    const newPlayer = { id: generateId(), name: playerName };
+    setSelectedGroupPlayers(prev => [...prev, newPlayer]);
+    setAnnouncement(`${playerName} added to selected players`);
   };
 
   const handleRemoveFromSelected = (playerId) => {
+      // Find the player name
+      const playerToRemove = selectedGroupPlayers.find(p => p.id === playerId);
+      if (!playerToRemove) return;
+      
+      const playerName = playerToRemove.name;
+
+      // Find which group this player belongs to (to know where to animate back to)
+      // We prioritize the currently expanded group if they are in it
+      let targetGroupName = null;
+      
+      if (expandedGroup && savedGroups[expandedGroup]?.includes(playerName)) {
+        targetGroupName = expandedGroup;
+      } else {
+        // Search all groups
+        for (const [groupName, players] of Object.entries(savedGroups)) {
+          if (players.includes(playerName)) {
+            targetGroupName = groupName;
+            break;
+          }
+        }
+      }
+
+      // If we found a group, set up the animation
+      if (targetGroupName) {
+        // Find the source element (the row in the selected list)
+        const sourceEl = document.querySelector(`[data-player-name="${playerName}"]`);
+        
+        if (sourceEl) {
+          const sourceRect = sourceEl.getBoundingClientRect();
+          
+          setAnimatingPlayers(prev => ({
+            ...prev,
+            [playerName]: {
+              sourceRect: {
+                top: sourceRect.top,
+                left: sourceRect.left,
+                width: sourceRect.width,
+                height: sourceRect.height
+              },
+              targetRect: null,
+              status: 'measuring',
+              direction: 'removing', // New field to indicate direction
+              groupName: targetGroupName
+            }
+          }));
+        }
+      }
+
       setSelectedGroupPlayers(prev => prev.filter(p => p.id !== playerId));
   };
 
@@ -1196,7 +1362,7 @@ export default function OfflinePage() {
                     </span>
                 </div>
 
-                <div className="min-h-[100px]">
+                <div className="min-h-[100px]" ref={selectedListRef}>
                     {selectedGroupPlayers.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-8 text-gray-500 border-2 border-dashed border-gray-800 rounded-lg bg-gray-900/30">
                             <User className="h-8 w-8 mb-2 opacity-50" />
@@ -1221,6 +1387,7 @@ export default function OfflinePage() {
                                         name={player.name} 
                                         index={index} 
                                         onRemove={() => handleRemoveFromSelected(player.id)}
+                                        style={animatingPlayers[player.name] ? { opacity: 0 } : {}}
                                     />
                                 ))}
                             </SortableContext>
@@ -1250,9 +1417,10 @@ export default function OfflinePage() {
                                     <div 
                                         className="flex items-center justify-between p-3 cursor-pointer hover:bg-gray-800/50 transition-colors"
                                         onClick={() => handleToggleGroup(groupName)}
+                                        data-group-header={groupName}
                                     >
                                         <div className="flex items-center gap-3 overflow-hidden">
-                                            <div className="bg-gray-700/50 w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-medium text-gray-400">
+                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold text-white shadow-sm ${getAvatarColor(groupName)}`}>
                                                 {groupName.charAt(0).toUpperCase()}
                                             </div>
                                             <span className="font-medium text-base truncate text-gray-200">{groupName}</span>
@@ -1273,25 +1441,34 @@ export default function OfflinePage() {
                                     </div>
                                     {expandedGroup === groupName && (
                                         <div className="p-3 space-y-2 bg-gray-900/30 border-t border-gray-700 animate-in slide-in-from-top-2 duration-200">
+                                    <AnimatePresence>
                                             {groupPlayers
                                                 .filter(playerName => !selectedGroupPlayers.some(p => p.name === playerName))
                                                 .map((playerName) => {
                                                 return (
-                                                    <div 
+                                                    <motion.div 
+                                                        layout
+                                                        initial={{ opacity: 0, height: 0 }}
+                                                        animate={{ opacity: 1, height: 'auto' }}
+                                                        exit={{ opacity: 0, height: 0, marginBottom: 0, padding: 0, border: 0, overflow: 'hidden' }}
+                                                        transition={{ duration: 0.3 }}
                                                         key={playerName} 
-                                                        className="group flex items-center justify-between p-3 rounded-md transition-all cursor-pointer bg-gray-800/40 border border-gray-700/50 hover:bg-gray-700/60 hover:border-gray-500 active:scale-[0.99]"
-                                                        onClick={() => handleMovePlayerToSelected(playerName)}
+                                                        ref={el => playerRefs.current[`${groupName}-${playerName}`] = el}
+                                                        data-player-name={playerName}
+                                                        className="group flex items-center justify-between p-3 rounded-md cursor-pointer bg-gray-800/40 border border-gray-700/50 hover:bg-gray-700/60 hover:border-gray-500 mb-2"
+                                                        onClick={() => handleMovePlayerToSelected(playerName, groupName)}
                                                     >
                                                         <div className="flex items-center gap-3">
-                                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shadow-sm ${getAvatarColor(playerName)}`}>
+                                                            <div className="bg-gray-700/50 w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium text-gray-400">
                                                                 {getInitials(playerName)}
                                                             </div>
                                                             <span className="text-sm font-medium text-gray-300 group-hover:text-white">{playerName}</span>
                                                         </div>
                                                         <Plus className="h-5 w-5 text-purple-400 opacity-0 group-hover:opacity-100 transition-all duration-200 transform group-hover:scale-110" />
-                                                    </div>
+                                                    </motion.div>
                                                 );
                                             })}
+                                            </AnimatePresence>
                                             {groupPlayers.every(p => selectedGroupPlayers.some(sp => sp.name === p)) && (
                                                 <div className="flex items-center justify-center py-3 text-gray-500 gap-2">
                                                     <div className="w-1.5 h-1.5 rounded-full bg-green-500/50"></div>
@@ -1328,6 +1505,105 @@ export default function OfflinePage() {
                 </Button>
             </div>
           </DialogFooter>
+
+          {/* Animation Portal for Flying Elements */}
+          <AnimatePresence>
+            {Object.entries(animatingPlayers).map(([name, data]) => {
+              if (data.status !== 'animating' || !data.targetRect) return null;
+              
+              const isRemoving = data.direction === 'removing';
+
+              // Colors for interpolation
+              const sourceStyle = {
+                backgroundColor: "rgba(31, 41, 55, 0.4)", // bg-gray-800/40
+                borderColor: "rgba(55, 65, 81, 0.5)"      // border-gray-700/50
+              };
+              const destStyle = {
+                backgroundColor: "rgba(31, 41, 55, 1)",   // bg-gray-800
+                borderColor: "rgba(55, 65, 81, 1)"        // border-gray-700
+              };
+
+              return (
+                <motion.div
+                  key={name}
+                  initial={{
+                    position: 'fixed',
+                    top: data.sourceRect.top,
+                    left: data.sourceRect.left,
+                    width: data.sourceRect.width,
+                    height: data.sourceRect.height,
+                    zIndex: 9999,
+                    ...(isRemoving ? destStyle : sourceStyle)
+                  }}
+                  animate={{
+                    top: data.targetRect.top,
+                    left: data.targetRect.left,
+                    width: data.targetRect.width,
+                    height: data.targetRect.height,
+                    zIndex: 9999,
+                    ...(isRemoving ? sourceStyle : destStyle)
+                  }}
+                  transition={{
+                    duration: 0.45,
+                    ease: [0.4, 0, 0.2, 1],
+                  }}
+                  onAnimationComplete={() => {
+                    setAnimatingPlayers(prev => {
+                      const newState = { ...prev };
+                      delete newState[name];
+                      return newState;
+                    });
+                  }}
+                  className="fixed pointer-events-none z-[9999] rounded-md border shadow-xl overflow-hidden"
+                >
+                    {/* Layer 1: Source Layout (Group Item Style) */}
+                    <motion.div
+                        className="absolute inset-0 flex items-center justify-between p-3"
+                        initial={{ opacity: isRemoving ? 0 : 1 }}
+                        animate={{ opacity: isRemoving ? 1 : 0 }}
+                        transition={{ 
+                            duration: 0.2,
+                            delay: isRemoving ? 0.25 : 0 
+                        }}
+                    >
+                        <div className="flex items-center gap-3">
+                            <div className="bg-gray-700/50 w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-medium text-gray-400">
+                                {getInitials(name)}
+                            </div>
+                            <span className="text-sm font-medium text-gray-300 whitespace-nowrap">{name}</span>
+                        </div>
+                        <Plus className="h-5 w-5 text-purple-400" />
+                    </motion.div>
+
+                    {/* Layer 2: Destination Layout (List Item Style) */}
+                    <motion.div
+                        className="absolute inset-0 flex items-center gap-3 p-3"
+                        initial={{ opacity: isRemoving ? 1 : 0 }}
+                        animate={{ opacity: isRemoving ? 0 : 1 }}
+                        transition={{ 
+                            duration: 0.2,
+                            delay: isRemoving ? 0 : 0.25 
+                        }}
+                    >
+                        <div className="text-gray-500 flex-shrink-0 p-1">
+                            <GripVertical size={20} />
+                        </div>
+                        <div className="bg-gray-700/50 w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-medium text-gray-400">
+                            {(data.targetIndex !== undefined ? data.targetIndex : 0) + 1}
+                        </div>
+                        <span className="flex-1 truncate text-base font-medium text-gray-200">{name}</span>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-gray-400 opacity-0"
+                        >
+                            <Minus className="h-4 w-4" />
+                        </Button>
+                    </motion.div>
+                </motion.div>
+              );
+            })}
+          </AnimatePresence>
         </DialogContent>
       </Dialog>
 
