@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom"
+import { Link, useNavigate } from "react-router-dom"
 import { useAuth } from "../context/AuthContext"
 import { Button } from "../components/ui/button"
 import { 
@@ -8,7 +8,12 @@ import {
   Info, 
   Smartphone, 
   User,
-  LogOut
+  LogOut,
+  Calendar, 
+  Clock, 
+  Search, 
+  Trash2, 
+  X
 } from "lucide-react"
 import { avatarOptions } from '../utils/avatars';
 import { 
@@ -191,8 +196,11 @@ const BackgroundCircles = () => {
   );
 };
 
+
+
 export default function HomePage() {
   const { isAuthenticated, user, logout } = useAuth();
+  const navigate = useNavigate();
 
   // Add scrollbar styles to the document
   useEffect(() => {
@@ -273,8 +281,7 @@ export default function HomePage() {
                       style={{ background: "var(--gradient-primary)" }}
                       className="hover:opacity-90 transition-opacity"
                     >
-                      <User className="mr-2 h-4 w-4" />
-                      Account
+                      <User className="h-4 w-4" />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-56">
@@ -347,9 +354,13 @@ export default function HomePage() {
                   <Link to="/offline">
                     <Button className="w-full" style={{ background: "var(--gradient-cool)" }}>Start Offline Game</Button>
                   </Link>
-                  <Link to="/groups">
-                    <Button className="w-full" variant="outline">Groups</Button>
-                  </Link>
+                  <Button 
+                    className="w-full" 
+                    variant="outline"
+                    onClick={() => navigate('/history')}
+                  >
+                    History
+                  </Button>
                 </div>
               </div>
             </div>
@@ -396,11 +407,11 @@ export default function HomePage() {
             </div>
           </div>
         </section>
-
-        <footer className="mt-20 text-center text-muted-foreground text-sm">
-          <p> 2023 Code Undercover. All rights reserved.</p>
-        </footer>
       </div>
+
+      <footer className="mt-20 text-center text-muted-foreground text-sm">
+        <p> 2023 Code Undercover. All rights reserved.</p>
+      </footer>
     </div>
   )
 }

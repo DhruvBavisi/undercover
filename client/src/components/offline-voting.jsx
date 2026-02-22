@@ -40,9 +40,9 @@ export default function OfflineVoting({
       <div className="w-full max-w-md">
         <Card className="border-gray-700 bg-gray-800/40 shadow-lg backdrop-blur-sm">
           <CardHeader className="text-center border-b border-gray-700">
-            <Badge variant="outline" className="mx-auto mb-2 px-3 py-1">
+            {/* <Badge variant="outline" className="mx-auto mb-2 px-3 py-1">
               Round {round}
-            </Badge>
+            </Badge> */}
             <CardTitle className="text-2xl">Elimination Phase</CardTitle>
             <CardDescription>
               Discuss and vote on who to eliminate

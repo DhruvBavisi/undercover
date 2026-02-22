@@ -29,6 +29,7 @@ import PauseMenu from "./pause-menu";
  * @param {Function} props.onRestart
  * @param {Function} props.onAddPlayer
  * @param {Function} props.onQuit
+ * @param {Function} props.onSaveGame
  */
 export default function OfflineGameOver({
   players,

@@ -32,6 +32,13 @@ import {
 import { ScrollArea } from "../components/ui/scroll-area";
 import PauseMenu from "../components/pause-menu";
 import { getRandomWordPair, assignRoles, randomizeSpeakingOrder } from "../utils/game-utils";
+import { 
+  getRecommendedRoles, 
+  calculateRounds, 
+  getMaxUndercover, 
+  getMaxMrWhite, 
+  getMinCivilians 
+} from "../utils/roleDistribution";
 
 // DnD Imports
 import {
@@ -65,6 +72,36 @@ const generateId = () => {
   return `player-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 };
 
+// Utility to generate initials from name
+const getInitials = (name) => {
+    if (!name) return "?";
+    return name
+        .split(' ')
+        .map(word => word.charAt(0))
+        .join('')
+        .toUpperCase()
+        .slice(0, 2);
+};
+
+// Utility to generate consistent color from string
+const getAvatarColor = (name) => {
+    if (!name) return "bg-gray-600";
+    const colors = [
+        "bg-red-500", "bg-orange-500", "bg-amber-500", "bg-yellow-500", 
+        "bg-lime-500", "bg-green-500", "bg-emerald-500", "bg-teal-500", 
+        "bg-cyan-500", "bg-sky-500", "bg-blue-500", "bg-indigo-500", 
+        "bg-violet-500", "bg-purple-500", "bg-fuchsia-500", "bg-pink-500", "bg-rose-500"
+    ];
+    
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) {
+        hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    
+    const index = Math.abs(hash) % colors.length;
+    return colors[index];
+};
+
 // Sortable Player Row Component
 function SortablePlayerRow({ id, index, value, error, onChange, onBlur, onRemove, onKeyDown, inputRef }) {
   const {
@@ -85,12 +122,12 @@ function SortablePlayerRow({ id, index, value, error, onChange, onBlur, onRemove
   };
 
   return (
-    <div ref={setNodeRef} style={style} className="flex flex-col mb-3 touch-none">
+    <div ref={setNodeRef} style={style} className="flex flex-col mb-3">
         <div className={`flex items-center gap-2 ${isDragging ? 'shadow-lg ring-2 ring-purple-500 rounded-md' : ''}`}>
             <div 
                 {...attributes} 
                 {...listeners} 
-                className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-white flex-shrink-0 p-2"
+                className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-white flex-shrink-0 p-2 touch-none"
             >
                 <GripVertical size={20} />
             </div>
@@ -123,7 +160,7 @@ function SortablePlayerRow({ id, index, value, error, onChange, onBlur, onRemove
 }
 
     // Sortable Row for Load Group Dialog
-    function SortableDialogRow({ id, name, index }) {
+    function SortableDialogRow({ id, name, index, onRemove }) {
         const {
         attributes,
         listeners,
@@ -145,14 +182,14 @@ function SortablePlayerRow({ id, index, value, error, onChange, onBlur, onRemove
         <div 
             ref={setNodeRef} 
             style={style} 
-            className={`flex items-center gap-3 bg-gray-800 p-3 rounded-md border mb-2 touch-none select-none transition-colors ${
+            className={`flex items-center gap-3 bg-gray-800 p-3 rounded-md border mb-2 select-none transition-colors group ${
                 isDragging ? 'shadow-lg ring-2 ring-purple-500 border-purple-500' : 'border-gray-700 hover:border-gray-500'
             }`}
         >
             <div 
                 {...attributes} 
                 {...listeners} 
-                className="cursor-grab active:cursor-grabbing text-gray-500 hover:text-gray-300 flex-shrink-0 p-1"
+                className="cursor-grab active:cursor-grabbing text-gray-500 hover:text-gray-300 flex-shrink-0 p-1 touch-none"
             >
                 <GripVertical size={20} />
             </div>
@@ -160,6 +197,17 @@ function SortablePlayerRow({ id, index, value, error, onChange, onBlur, onRemove
                 {index + 1}
             </div>
             <span className="flex-1 truncate text-base font-medium text-gray-200">{name}</span>
+            <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-gray-400 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                onClick={(e) => {
+                    e.stopPropagation(); // Prevent drag start if clicked
+                    onRemove();
+                }}
+            >
+                <Minus className="h-4 w-4" />
+            </Button>
         </div>
         );
     }
@@ -208,10 +256,10 @@ export default function OfflinePage() {
   const [savedGroups, setSavedGroups] = useState({});
   const [expandedGroup, setExpandedGroup] = useState(null);
   const [selectedGroupPlayers, setSelectedGroupPlayers] = useState([]); // List of checked players from left panel
+  const [announcement, setAnnouncement] = useState(""); // ARIA announcement state
   
   // Startup Dialog State
-  const [showLastPlayedDialog, setShowLastPlayedDialog] = useState(false);
-  const [lastPlayedPlayers, setLastPlayedPlayers] = useState([]);
+  // Removed as per user request to remove auto-saved game dialog
 
   // Refs for player name inputs
   const inputRefs = useRef([]);
@@ -291,7 +339,6 @@ export default function OfflinePage() {
   useEffect(() => {
     const returnToSetup = localStorage.getItem("returnToSetup");
     const storedSettings = localStorage.getItem("offlineGameSettings");
-    const lastUsedPlayersStr = localStorage.getItem("lastUsedPlayers");
     
     // Use the actual values from location state directly to avoid dependency issues
     const locState = location.state || {};
@@ -351,74 +398,12 @@ export default function OfflinePage() {
           variant: "destructive",
         });
       }
-    } else if (lastUsedPlayersStr) {
-      try {
-        const names = JSON.parse(lastUsedPlayersStr);
-        if (Array.isArray(names) && names.length > 0) {
-          // Instead of auto-loading, ask the user
-          setLastPlayedPlayers(names);
-          setShowLastPlayedDialog(true);
-        }
-      } catch (error) {
-        console.error("Error loading last used players:", error);
-      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Run only once on mount
 
   // Calculate role limits
-  const getMaxUndercover = (count) => {
-    if (count <= 3) return 1;
-    if (count <= 5) return 2;
-    if (count <= 7) return 3;
-    if (count <= 9) return 4;
-    if (count <= 11) return 5;
-    if (count <= 13) return 6;
-    if (count <= 15) return 7;
-    if (count <= 17) return 8;
-    return 9; // Max 9 for 18-20 players
-  };
-
-  const getMaxMrWhite = (count) => {
-    if (count <= 3) return 1;
-    if (count <= 5) return 2;
-    if (count <= 7) return 3;
-    if (count <= 9) return 4;
-    if (count <= 11) return 5;
-    if (count <= 13) return 6;
-    if (count <= 15) return 7;
-    if (count <= 17) return 8;
-    return 9; // Max 9 for 18-20 players
-  };
-
-  const getMinCivilians = (count) => {
-    return Math.ceil(count / 2);
-  };
-
-  // Get recommended role distribution based on player count
-  const getRecommendedRoles = (count) => {
-    switch (count) {
-      case 3: return { undercover: 1, mrWhite: 0 }; // 2 Civilians
-      case 4: return { undercover: 1, mrWhite: 0 }; // 3 Civilians
-      case 5: return { undercover: 1, mrWhite: 1 }; // 3 Civilians
-      case 6: return { undercover: 1, mrWhite: 1 }; // 4 Civilians
-      case 7: return { undercover: 2, mrWhite: 1 }; // 4 Civilians
-      case 8: return { undercover: 2, mrWhite: 1 }; // 5 Civilians
-      case 9: return { undercover: 3, mrWhite: 1 }; // 5 Civilians
-      case 10: return { undercover: 3, mrWhite: 1 }; // 6 Civilians
-      case 11: return { undercover: 3, mrWhite: 2 }; // 6 Civilians
-      case 12: return { undercover: 3, mrWhite: 2 }; // 7 Civilians
-      case 13: return { undercover: 4, mrWhite: 2 }; // 7 Civilians
-      case 14: return { undercover: 4, mrWhite: 2 }; // 8 Civilians
-      case 15: return { undercover: 5, mrWhite: 2 }; // 8 Civilians
-      case 16: return { undercover: 5, mrWhite: 2 }; // 9 Civilians
-      case 17: return { undercover: 5, mrWhite: 3 }; // 9 Civilians
-      case 18: return { undercover: 5, mrWhite: 3 }; // 10 Civilians
-      case 19: return { undercover: 6, mrWhite: 3 }; // 11 Civilians
-      case 20: return { undercover: 6, mrWhite: 3 }; // 11 Civilians
-      default: return { undercover: 1, mrWhite: 0 };
-    }
-  };
+  // Used to be defined here, now imported from utils/roleDistribution.js
 
   // Apply recommended role distribution
   const applyRecommendedRoles = (count) => {
@@ -436,6 +421,12 @@ export default function OfflinePage() {
   const maxUndercover = getMaxUndercover(playerCount);
   const maxMrWhite = getMaxMrWhite(playerCount);
   const minCivilians = getMinCivilians(playerCount);
+
+  // Reusable utility function to update role counts and rounds
+  const updateRoleCounts = (count) => {
+    applyRecommendedRoles(count);
+    setRounds(calculateRounds(count));
+  };
 
   const handlePlayerCountChange = (count) => {
     if (count < 3) count = 3;
@@ -463,21 +454,24 @@ export default function OfflinePage() {
       setPlayerIds(playerIds.slice(0, count));
     }
 
-    // Apply recommended roles based on new player count
-    applyRecommendedRoles(count);
-    setRounds(count - 2);
+    // Update roles and rounds using the reusable utility
+    updateRoleCounts(count);
   };
 
   const handleAddPlayer = () => {
     if (playerCount < 20) { // Changed max to 20 consistent with slider
-      setPlayerCount(playerCount + 1);
+      const newCount = playerCount + 1;
+      setPlayerCount(newCount);
       
       // Only add a new empty player name if we're adding beyond the current list
-      if (playerCount >= players.length) {
+      if (newCount > players.length) {
         setPlayers([...players, ""]);
         setNameErrors([...nameErrors, ""]);
         setPlayerIds([...playerIds, generateId()]);
       }
+
+      // Update roles and rounds
+      updateRoleCounts(newCount);
     }
   };
 
@@ -699,7 +693,28 @@ export default function OfflinePage() {
         const groups = JSON.parse(localStorage.getItem("playerGroups") || "{}");
         setSavedGroups(groups);
         setExpandedGroup(null);
-        setSelectedGroupPlayers([]);
+        
+        // Sync current players to selection
+        const currentValidPlayers = players
+            .filter(p => typeof p === 'string' && p.trim() !== "")
+            .map(p => ({
+                id: generateId(), 
+                name: p
+            }));
+            
+        console.log(`[Sync] Synchronizing ${currentValidPlayers.length} players from input to load dialog.`);
+        
+        // Validation logging
+        const allGroupPlayers = new Set(Object.values(groups).flat());
+        const missingPlayers = currentValidPlayers.filter(p => !allGroupPlayers.has(p.name));
+        
+        if (missingPlayers.length > 0) {
+            console.warn(`[Sync Warning] The following input players are not found in any saved group: ${missingPlayers.map(p => p.name).join(", ")}`);
+        } else {
+            console.log(`[Sync Success] All input players match existing saved group entries.`);
+        }
+
+        setSelectedGroupPlayers(currentValidPlayers);
         setShowLoadGroupDialog(true);
     } catch (e) {
         console.error(e);
@@ -727,23 +742,14 @@ export default function OfflinePage() {
       }
   };
 
-  const handleTogglePlayerSelection = (playerName, isChecked) => {
-      if (isChecked) {
-          // Add to selection
-          const newPlayer = { id: generateId(), name: playerName };
-          setSelectedGroupPlayers(prev => [...prev, newPlayer]);
-      } else {
-          // Remove from selection (remove first occurrence of name)
-          setSelectedGroupPlayers(prev => {
-              const idx = prev.findIndex(p => p.name === playerName);
-              if (idx !== -1) {
-                  const newArr = [...prev];
-                  newArr.splice(idx, 1);
-                  return newArr;
-              }
-              return prev;
-          });
-      }
+  const handleMovePlayerToSelected = (playerName) => {
+      const newPlayer = { id: generateId(), name: playerName };
+      setSelectedGroupPlayers(prev => [...prev, newPlayer]);
+      setAnnouncement(`${playerName} added to selected players`);
+  };
+
+  const handleRemoveFromSelected = (playerId) => {
+      setSelectedGroupPlayers(prev => prev.filter(p => p.id !== playerId));
   };
 
   const handleDragEndDialog = (event) => {
@@ -763,16 +769,70 @@ export default function OfflinePage() {
       }
   };
 
-  const handleUseSelectedPlayers = () => {
-      const names = selectedGroupPlayers.map(p => p.name);
-      setPlayers(names);
-      setPlayerCount(names.length);
-      setNameErrors(Array(names.length).fill(""));
-      setPlayerIds(selectedGroupPlayers.map(() => generateId()));
-      applyRecommendedRoles(names.length);
-      setRounds(Math.max(1, names.length - 2));
+  const handleAddSelectedPlayers = () => {
+      // Get existing non-empty players
+      const existingNames = players
+          .map(p => (typeof p === "string" ? p : p.name || ""))
+          .filter(name => name.trim() !== "");
+          
+      // Filter out players that are already in the existing list to avoid duplicates
+      const newNames = selectedGroupPlayers
+          .map(p => p.name)
+          .filter(name => !existingNames.includes(name));
+      
+      if (newNames.length === 0) {
+          toast({ title: "No New Players", description: "All selected players are already in the list." });
+          return;
+      }
+
+      let allNames = [...existingNames, ...newNames];
+      let count = allNames.length;
+      let description = `${newNames.length} new players added.`;
+
+      if (count > 20) {
+          allNames = allNames.slice(0, 20);
+          count = 20;
+          description = `${newNames.length} new players added. List truncated to 20 maximum.`;
+      }
+
+      // Enforce minimum 3 players
+      if (count < 3) {
+        const needed = 3 - count;
+        allNames = [...allNames, ...Array(needed).fill("")];
+        count = 3;
+      }
+
+      setPlayers(allNames);
+      setPlayerCount(count);
+      setNameErrors(Array(count).fill(""));
+      setPlayerIds(allNames.map(() => generateId()));
+      applyRecommendedRoles(count);
+      setRounds(Math.max(1, count - 2));
       setShowLoadGroupDialog(false);
-      toast({ title: "Players Loaded", description: `${names.length} players loaded.` });
+      toast({ title: "Players Added", description });
+  };
+
+  const handleUseSelectedPlayers = () => {
+      let names = selectedGroupPlayers.map(p => p.name);
+      let count = names.length;
+      let description = `${count} players loaded.`;
+
+      // Enforce minimum 3 players
+      if (count < 3) {
+        const needed = 3 - count;
+        names = [...names, ...Array(needed).fill("")];
+        count = 3;
+        description = `${selectedGroupPlayers.length} players loaded. Added empty slots to meet minimum of 3.`;
+      }
+
+      setPlayers(names);
+      setPlayerCount(count);
+      setNameErrors(Array(count).fill(""));
+      setPlayerIds(names.map(() => generateId()));
+      applyRecommendedRoles(count);
+      setRounds(Math.max(1, count - 2));
+      setShowLoadGroupDialog(false);
+      toast({ title: "Players Loaded", description });
   };
 
   // --- Feature 2: Main List Drag Logic ---
@@ -795,21 +855,10 @@ export default function OfflinePage() {
     }
   };
 
-  // --- Startup Dialog Logic ---
-  const handleLoadLastPlayed = () => {
-      setPlayers(lastPlayedPlayers);
-      setPlayerCount(lastPlayedPlayers.length);
-      setNameErrors(Array(lastPlayedPlayers.length).fill(""));
-      setPlayerIds(lastPlayedPlayers.map(() => generateId()));
-      applyRecommendedRoles(lastPlayedPlayers.length);
-      setShowLastPlayedDialog(false);
-      toast({ title: "Welcome back!", description: "Last played players loaded." });
-  };
-
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 text-white">
-      <div className="container mx-auto px-4 py-12">
-        <div className="flex justify-between items-center mb-8">
+      <div className="container mx-auto px-4 py-6">
+        <div className="flex justify-between items-center mb-6">
           <Link to="/" className="text-blue-400 hover:text-blue-300 inline-flex items-center">
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Home
@@ -818,9 +867,9 @@ export default function OfflinePage() {
             variant="outline"
             size="icon"
             onClick={handlePauseGame}
-            className="h-8 w-8"
+            className="h-8 w-8 bg-gray-800/70"
           >
-            <Pause className="h-4 w-4" />
+            <Pause className="h-4 w-4 fill-white" />
           </Button>
         </div>
 
@@ -996,7 +1045,7 @@ export default function OfflinePage() {
 
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
-                    <Label>Player Names</Label>
+                    <Label>Players</Label>
                     <div className="flex gap-2">
                         <Button 
                             variant="outline" 
@@ -1124,7 +1173,7 @@ export default function OfflinePage() {
 
       {/* Load Group Dialog */}
       <Dialog open={showLoadGroupDialog} onOpenChange={setShowLoadGroupDialog}>
-        <DialogContent className="bg-gray-800 border-gray-700 text-white w-[95vw] max-w-2xl max-h-[90vh] overflow-hidden flex flex-col p-4 md:p-6">
+        <DialogContent className="bg-gray-800 border-gray-700 text-white w-full h-full max-w-none rounded-none overflow-hidden flex flex-col p-4 md:p-6">
           <DialogHeader>
             <DialogTitle>Load Player Group</DialogTitle>
             <DialogDescription className="text-gray-400">
@@ -1132,70 +1181,28 @@ export default function OfflinePage() {
             </DialogDescription>
           </DialogHeader>
           
-          <div className="flex flex-col md:grid md:grid-cols-2 gap-4 flex-1 overflow-hidden mt-2">
-            {/* Left Panel: Checklist */}
-            <div className="border border-gray-700 rounded-md flex flex-col overflow-hidden h-[200px] md:h-[300px]">
-                <div className="p-3 bg-gray-900/50 border-b border-gray-700 font-semibold text-sm">Saved Groups</div>
-                <ScrollArea className="flex-1 p-2">
-                    {Object.keys(savedGroups).length === 0 ? (
-                        <p className="text-gray-500 text-sm italic text-center mt-4">No saved groups</p>
-                    ) : (
-                        <div className="space-y-2">
-                            {Object.entries(savedGroups).map(([groupName, groupPlayers]) => (
-                                <div key={groupName} className="border border-gray-700 rounded-md overflow-hidden">
-                                    <div 
-                                        className="flex items-center justify-between p-3 bg-gray-700/30 cursor-pointer hover:bg-gray-700/50"
-                                        onClick={() => handleToggleGroup(groupName)}
-                                    >
-                                        <span className="font-medium text-base truncate flex-1">{groupName}</span>
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-xs text-gray-400">({groupPlayers.length})</span>
-                                            <Button 
-                                                variant="ghost" 
-                                                size="icon" 
-                                                className="h-8 w-8 text-gray-400 hover:text-red-400"
-                                                onClick={(e) => handleDeleteGroup(groupName, e)}
-                                            >
-                                                <Trash2 className="h-4 w-4" />
-                                            </Button>
-                                        </div>
-                                    </div>
-                                    {expandedGroup === groupName && (
-                                        <div className="p-2 space-y-2 bg-gray-900/40 border-t border-gray-700">
-                                            {groupPlayers.map((playerName) => {
-                                                const isChecked = selectedGroupPlayers.some(p => p.name === playerName);
-                                                return (
-                                                    <div 
-                                                        key={playerName} 
-                                                        className={`flex items-center justify-between p-3 rounded-md transition-all cursor-pointer mb-1 ${
-                                                            isChecked 
-                                                                ? 'bg-purple-900/30 border-2 border-purple-600' 
-                                                                : 'bg-gray-800/30 border border-gray-700 hover:bg-gray-800 hover:border-gray-500'
-                                                        }`}
-                                                        onClick={() => handleTogglePlayerSelection(playerName, !isChecked)}
-                                                    >
-                                                        <span className="text-base font-medium text-gray-200 pl-1">{playerName}</span>
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    )}
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </ScrollArea>
-            </div>
-
-            {/* Right Panel: Ordered List */}
-            <div className="border border-gray-700 rounded-md flex flex-col overflow-hidden h-[200px] md:h-[300px]">
-                <div className="p-3 bg-gray-900/50 border-b border-gray-700 font-semibold text-sm flex justify-between">
-                    <span>Selected Players</span>
-                    <span className="text-gray-400 text-xs">{selectedGroupPlayers.length} selected</span>
+          <div role="status" aria-live="polite" className="sr-only">
+            {announcement}
+          </div>
+          
+          <ScrollArea className="flex-1 mt-4 border border-gray-700 rounded-md bg-gray-900/20">
+            <div className="p-4 pt-0 space-y-8">
+              {/* Section 1: Selected Players */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between border-b border-gray-700 pb-2 sticky top-0 bg-gray-900/95 backdrop-blur-sm z-10 -mx-4 px-4 pt-2">
+                    <h3 className="font-semibold text-sm text-gray-200">Selected Players</h3>
+                    <span className="text-xs text-gray-400 bg-gray-800 px-2 py-0.5 rounded-full border border-gray-700">
+                        {selectedGroupPlayers.length}
+                    </span>
                 </div>
-                <ScrollArea className="flex-1 p-2 bg-gray-900/20">
+
+                <div className="min-h-[100px]">
                     {selectedGroupPlayers.length === 0 ? (
-                        <p className="text-gray-500 text-sm italic text-center mt-4">Select players from the left</p>
+                        <div className="flex flex-col items-center justify-center py-8 text-gray-500 border-2 border-dashed border-gray-800 rounded-lg bg-gray-900/30">
+                            <User className="h-8 w-8 mb-2 opacity-50" />
+                            <p className="text-sm italic">No players selected</p>
+                            <p className="text-xs text-gray-600 mt-1">Tap players from groups below to add them</p>
+                        </div>
                     ) : (
                         <DndContext 
                                 sensors={sensors}
@@ -1208,69 +1215,123 @@ export default function OfflinePage() {
                                 strategy={verticalListSortingStrategy}
                             >
                                 {selectedGroupPlayers.map((player, index) => (
-                                    <SortableDialogRow key={player.id} id={player.id} name={player.name} index={index} />
+                                    <SortableDialogRow 
+                                        key={player.id} 
+                                        id={player.id} 
+                                        name={player.name} 
+                                        index={index} 
+                                        onRemove={() => handleRemoveFromSelected(player.id)}
+                                    />
                                 ))}
                             </SortableContext>
                         </DndContext>
                     )}
-                </ScrollArea>
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowLoadGroupDialog(false)} className="border-gray-600 hover:bg-gray-700">Cancel</Button>
-            <Button 
-                onClick={handleUseSelectedPlayers} 
-                className="bg-purple-600 hover:bg-purple-700"
-                disabled={selectedGroupPlayers.length === 0}
-            >
-                Use Selected Players
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Startup Last Played Dialog */}
-      <Dialog open={showLastPlayedDialog} onOpenChange={setShowLastPlayedDialog}>
-        <DialogContent className="bg-gray-800 border-gray-700 text-white z-[100]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-                <History className="h-5 w-5" />
-                Resume Last Session?
-            </DialogTitle>
-            <DialogDescription className="text-gray-400">
-              We found a list of players from your last game. Would you like to load them?
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="py-4">
-              <p className="text-sm font-medium mb-2 text-gray-300">Players found:</p>
-              <div className="flex flex-wrap gap-2">
-                  {lastPlayedPlayers.map((name, i) => (
-                      <span key={i} className="bg-gray-700 px-2 py-1 rounded text-xs border border-gray-600">
-                          {name}
-                      </span>
-                  ))}
+                </div>
               </div>
-          </div>
 
-          <DialogFooter>
-            <Button 
-                variant="outline" 
-                onClick={() => setShowLastPlayedDialog(false)} 
-                className="border-gray-600 hover:bg-gray-700"
-            >
-                No, Start Fresh
-            </Button>
-            <Button 
-                onClick={handleLoadLastPlayed} 
-                className="bg-purple-600 hover:bg-purple-700"
-            >
-                Yes, Load Players
-            </Button>
+              {/* Section 2: Saved Groups */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between border-b border-gray-700 pb-2 sticky top-0 bg-gray-900/95 backdrop-blur-sm z-10 -mx-4 px-4 pt-2">
+                    <h3 className="font-semibold text-sm text-gray-200">Saved Groups</h3>
+                    <span className="text-xs text-gray-400 bg-gray-800 px-2 py-0.5 rounded-full border border-gray-700">
+                        {Object.keys(savedGroups).length}
+                    </span>
+                </div>
+
+                <div>
+                    {Object.keys(savedGroups).length === 0 ? (
+                        <div className="text-center py-8 text-gray-500">
+                            <p className="text-sm italic">No saved groups found</p>
+                        </div>
+                    ) : (
+                        <div className="space-y-3">
+                            {Object.entries(savedGroups).map(([groupName, groupPlayers]) => (
+                                <div key={groupName} className="border border-gray-700 rounded-lg overflow-hidden bg-gray-800/20">
+                                    <div 
+                                        className="flex items-center justify-between p-3 cursor-pointer hover:bg-gray-800/50 transition-colors"
+                                        onClick={() => handleToggleGroup(groupName)}
+                                    >
+                                        <div className="flex items-center gap-3 overflow-hidden">
+                                            <div className="bg-gray-700/50 w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-medium text-gray-400">
+                                                {groupName.charAt(0).toUpperCase()}
+                                            </div>
+                                            <span className="font-medium text-base truncate text-gray-200">{groupName}</span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-xs text-gray-400 bg-gray-800 px-2 py-0.5 rounded-full">
+                                                {groupPlayers.length} players
+                                            </span>
+                                            <Button 
+                                                variant="ghost" 
+                                                size="icon" 
+                                                className="h-8 w-8 text-gray-500 hover:text-red-400 hover:bg-red-900/20"
+                                                onClick={(e) => handleDeleteGroup(groupName, e)}
+                                            >
+                                                <Trash2 className="h-4 w-4" />
+                                            </Button>
+                                        </div>
+                                    </div>
+                                    {expandedGroup === groupName && (
+                                        <div className="p-3 space-y-2 bg-gray-900/30 border-t border-gray-700 animate-in slide-in-from-top-2 duration-200">
+                                            {groupPlayers
+                                                .filter(playerName => !selectedGroupPlayers.some(p => p.name === playerName))
+                                                .map((playerName) => {
+                                                return (
+                                                    <div 
+                                                        key={playerName} 
+                                                        className="group flex items-center justify-between p-3 rounded-md transition-all cursor-pointer bg-gray-800/40 border border-gray-700/50 hover:bg-gray-700/60 hover:border-gray-500 active:scale-[0.99]"
+                                                        onClick={() => handleMovePlayerToSelected(playerName)}
+                                                    >
+                                                        <div className="flex items-center gap-3">
+                                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shadow-sm ${getAvatarColor(playerName)}`}>
+                                                                {getInitials(playerName)}
+                                                            </div>
+                                                            <span className="text-sm font-medium text-gray-300 group-hover:text-white">{playerName}</span>
+                                                        </div>
+                                                        <Plus className="h-5 w-5 text-purple-400 opacity-0 group-hover:opacity-100 transition-all duration-200 transform group-hover:scale-110" />
+                                                    </div>
+                                                );
+                                            })}
+                                            {groupPlayers.every(p => selectedGroupPlayers.some(sp => sp.name === p)) && (
+                                                <div className="flex items-center justify-center py-3 text-gray-500 gap-2">
+                                                    <div className="w-1.5 h-1.5 rounded-full bg-green-500/50"></div>
+                                                    <p className="text-xs italic">All players added</p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+              </div>
+            </div>
+          </ScrollArea>
+
+          <DialogFooter className="gap-2 sm:gap-3 flex-col sm:flex-row">
+            <Button variant="outline" onClick={() => setShowLoadGroupDialog(false)} className="border-gray-600 hover:bg-gray-700 sm:mr-auto w-full sm:w-auto">Cancel</Button>
+            <div className="flex gap-2 w-full sm:w-auto">
+                <Button 
+                    onClick={handleAddSelectedPlayers} 
+                    className="bg-blue-600 hover:bg-blue-700 flex-1 sm:flex-none"
+                    disabled={selectedGroupPlayers.length === 0}
+                >
+                    Add to List
+                </Button>
+                <Button 
+                    onClick={handleUseSelectedPlayers} 
+                    className="bg-purple-600 hover:bg-purple-700 flex-1 sm:flex-none"
+                    disabled={selectedGroupPlayers.length === 0}
+                >
+                    Replace List
+                </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Startup Last Played Dialog - Removed */}
 
     </div>
   );

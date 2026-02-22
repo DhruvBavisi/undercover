@@ -20,6 +20,8 @@ import { AuthProvider } from './context/AuthContext.jsx';
 import { SocketProvider } from './context/SocketContext.jsx';
 import { GameRoomProvider } from './context/GameRoomContext.jsx';
 import OnlineGamePage from './pages/OnlineGamePage.jsx';
+import HistoryPage from './pages/HistoryPage.jsx';
+import ErrorPage from './pages/ErrorPage.jsx';
 
 // Create a wrapper component that includes all providers except RouterProvider
 const AppProviders = ({ children }) => {
@@ -41,6 +43,11 @@ const router = createBrowserRouter([
     element: (
       <AppProviders>
         <App />
+      </AppProviders>
+    ),
+    errorElement: (
+      <AppProviders>
+        <ErrorPage />
       </AppProviders>
     ),
     children: [
@@ -84,6 +91,7 @@ const router = createBrowserRouter([
       { path: 'offline', element: <OfflinePage /> },
       { path: 'offline/setup', element: <OfflinePage /> },
       { path: 'offline/game', element: <OfflineGamePage /> },
+      { path: 'history', element: <HistoryPage /> },
       { path: 'groups', element: <GroupsPage /> },
       { path: 'group/:groupId', element: <GroupDetailsPage /> },
       { path: 'login', element: <LoginPage /> },

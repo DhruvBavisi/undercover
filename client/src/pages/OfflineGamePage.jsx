@@ -46,6 +46,8 @@ export default function OfflineGamePage() {
   const [showQuitConfirm, setShowQuitConfirm] = useState(false);
   const [showAddPlayerConfirm, setShowAddPlayerConfirm] = useState(false);
 
+  const [startTime] = useState(Date.now());
+
   useEffect(() => {
     const storedSettings = localStorage.getItem("offlineGameSettings")
     if (storedSettings) {
@@ -102,6 +104,15 @@ export default function OfflineGamePage() {
       setEliminatedPlayerId(playerId)
       setPlayers(players.map((player) => (player.id === playerId ? { ...player, isEliminated: true } : player)))
       setGamePhase("elimination")
+    }
+  }
+
+  const handleUndoElimination = () => {
+    // Revert the elimination
+    if (eliminatedPlayerId) {
+      setPlayers(players.map((player) => (player.id === eliminatedPlayerId ? { ...player, isEliminated: false } : player)))
+      setEliminatedPlayerId(null)
+      setGamePhase("voting")
     }
   }
 
@@ -344,6 +355,7 @@ export default function OfflineGamePage() {
             <OfflineElimination
               player={players.find((p) => p.id === eliminatedPlayerId)}
               onComplete={handleEliminationComplete}
+              onUndo={handleUndoElimination}
               onWhiteGuess={handleWhiteGuess}
               civilianWord={wordPair[0]}
             />
