@@ -608,6 +608,10 @@ return (
     try {
       await submitVote(playerId);
       setSelectedPlayer(playerId);
+      
+      // Log vote count to console
+      console.log("Vote submitted for player:", playerId);
+      console.log("Current votes:", {...votes, [user.id]: playerId});
     } catch (error) {
       console.error('Error submitting vote:', error);
       toast({
@@ -620,6 +624,16 @@ return (
 
   // Handle vote confirmation updated to remove the player with most votes
   const handleVoteConfirm = () => {
+    // Send a message that the player has confirmed their vote
+    if (!confirmedVotes.has(user.id)) {
+      window.socket.emit('send-message', {
+        gameCode: room.roomCode,
+        playerId: user.id,
+        playerName: user.username,
+        content: "I've confirmed my vote."
+      });
+    }
+    
     setConfirmedVotes(prev => new Set(prev).add(user.id));
     if (confirmedVotes.size + 1 === room.players.length) {
       // All players have confirmed their votes: recalc voteCounts
@@ -639,6 +653,7 @@ return (
       });
       
       console.log("Eliminated Player:", eliminatedPlayer, "with votes:", maxVotes);
+      console.log("Vote counts:", voteCounts);
       
       // Emit the voting results to remove that player
       window.socket.emit('voting-results', {

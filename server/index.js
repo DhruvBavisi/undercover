@@ -252,6 +252,23 @@ currentRound.votes.push({ voterId, votedForId });
 
 await gameRoom.save();
 
+// Get voter name
+const voter = gameRoom.players.find(p => p.userId.toString() === voterId);
+const voterName = voter ? voter.name || voter.username : 'Unknown player';
+
+// Create a system message about the vote
+const message = {
+  id: 'system-' + Date.now(),
+  playerName: 'System',
+  userId: 'system',
+  content: `${voterName} has voted.`,
+  isSystem: true,
+  isDescription: false
+};
+
+// Broadcast the message to all players in the game room
+io.to(gameCode).emit('receive-message', message);
+
 // Broadcast vote to all players
 io.to(gameCode).emit('vote-submitted', { voterId, votedForId });
 
