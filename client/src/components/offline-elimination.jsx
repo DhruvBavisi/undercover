@@ -4,6 +4,7 @@ import { Input } from "./ui/input"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "./ui/card"
 import { Avatar, AvatarImage, AvatarFallback } from "./ui/avatar"
 import { User, UserX, AlertTriangle, Check, X, ArrowLeft } from "lucide-react"
+import { motion, AnimatePresence } from "framer-motion"
 
 /**
  * @typedef {Object} Player
@@ -53,7 +54,7 @@ export default function OfflineElimination({ player, civilianWord, onWhiteGuess,
   return (
     <div className="container mx-auto px-4 flex items-center justify-center min-h-screen">
       <div className="w-full max-w-md">
-        <Card className="border-gray-700 bg-gray-800/40 shadow-lg backdrop-blur-sm">
+        <Card className="border-gray-700 bg-gray-800/40 shadow-lg backdrop-blur-sm overflow-hidden">
           <CardHeader className="text-center border-b border-gray-700 relative">
             {onUndo && !showRole && (
               <Button 
@@ -68,91 +69,115 @@ export default function OfflineElimination({ player, civilianWord, onWhiteGuess,
             )}
             <CardTitle className="text-2xl">Player Eliminated</CardTitle>
           </CardHeader>
-          <CardContent className="text-center space-y-6 py-6 pt-6">
-            {!showRole ? (
-              <div className="py-8">
-                <h2 className="text-3xl font-bold mb-6">{player.name}</h2>
-
-                <p className="text-gray-300 mb-6">
-                  This player has been eliminated. Tap the button below to reveal their role.
-                </p>
-
-                <Button onClick={handleRevealRole} className="bg-red-600 hover:bg-red-700">
-                  Reveal Role
-                </Button>
-              </div>
-            ) : (
-              <div>
-                <div
-                  className={`inline-flex items-center justify-center p-2 rounded-full mb-4 ${
-                    player.role === "Civilian"
-                      ? "bg-green-500/20"
-                      : player.role === "Undercover"
-                        ? "bg-red-500/20"
-                        : "bg-gray-500/20"
-                  }`}
+          <CardContent className="text-center space-y-6 py-6 pt-6 min-h-[300px] flex flex-col justify-center">
+            <AnimatePresence mode="wait">
+              {!showRole ? (
+                <motion.div
+                  key="eliminated"
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 1.05 }}
+                  transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+                  className="py-8 w-full"
                 >
-                  <Avatar className="w-24 h-24 border-2 border-white/20">
-                    <AvatarImage src={player.avatar} alt={player.role} />
-                    <AvatarFallback className="text-2xl">{player.name.charAt(0)}</AvatarFallback>
-                  </Avatar>
-                </div>
+                  <h2 className="text-3xl font-bold mb-6">{player.name}</h2>
 
-                <h2 className={`text-3xl font-bold mb-4 ${getRoleColor()}`}>
-                  {player.role}
-                </h2>
+                  <p className="text-gray-300 mb-6">
+                    This player has been eliminated. Tap the button below to reveal their role.
+                  </p>
 
-                <p className="text-gray-300 mb-6 text-lg">
-                  {player.role === "Civilian" && `Oops! ${player.name} was a Civilian.`}
-                  {player.role === "Undercover" && `Great job! ${player.name} was an Undercover agent!`}
-                  {player.role === "Mr. White" && `You found Mr. White! ${player.name} has one chance to win...`}
-                </p>
+                  <Button onClick={handleRevealRole} className="bg-red-600 hover:bg-red-700">
+                    Reveal Role
+                  </Button>
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="role"
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+                  className="w-full"
+                >
+                  <div
+                    className={`inline-flex items-center justify-center p-2 rounded-full mb-4 ${
+                      player.role === "Civilian"
+                        ? "bg-green-500/20"
+                        : player.role === "Undercover"
+                          ? "bg-red-500/20"
+                          : "bg-gray-500/20"
+                    }`}
+                  >
+                    <Avatar className="w-24 h-24 border-2 border-white/20">
+                      <AvatarImage src={player.avatar} alt={player.role} />
+                      <AvatarFallback className="text-2xl">{player.name.charAt(0)}</AvatarFallback>
+                    </Avatar>
+                  </div>
 
-                {player.role === "Mr. White" ? (
-                  !guessSubmitted ? (
-                    <div className="mb-6">
-                      <p className="text-gray-300 mb-4">Mr. White gets one chance to guess the Civilians' word:</p>
-                      <div className="flex gap-2 max-w-xs mx-auto mb-4">
-                        <Input
-                          type="text"
-                          className="bg-gray-700 border-gray-600"
-                          placeholder="Enter your guess..."
-                          value={whiteGuess}
-                          onChange={(e) => setWhiteGuess(e.target.value)}
-                        />
-                        <Button onClick={handleSubmitGuess} disabled={!whiteGuess.trim()}>
-                          Guess
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="mb-6 space-y-4">
-                      <div
-                        className={`p-4 rounded-lg border ${
-                          guessCorrect ? "bg-green-500/20 border-green-500/30" : "bg-red-500/20 border-red-500/30"
-                        }`}
+                  <h2 className={`text-3xl font-bold mb-4 ${getRoleColor()}`}>
+                    {player.role}
+                  </h2>
+
+                  <p className="text-gray-300 mb-6 text-lg">
+                    {player.role === "Civilian" && `Oops! ${player.name} was a Civilian.`}
+                    {player.role === "Undercover" && `Great job! ${player.name} was an Undercover agent!`}
+                    {player.role === "Mr. White" && `You found Mr. White! ${player.name} has one chance to win...`}
+                  </p>
+
+                  {player.role === "Mr. White" ? (
+                    !guessSubmitted ? (
+                      <motion.div 
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.2 }}
+                        className="mb-6"
                       >
-                        <div className="flex items-center justify-center mb-2">
-                          {guessCorrect ? (
-                            <Check className="w-6 h-6 text-green-400 mr-2" />
-                          ) : (
-                            <X className="w-6 h-6 text-red-400 mr-2" />
-                          )}
-                          <span className={`font-bold ${guessCorrect ? "text-green-400" : "text-red-400"}`}>
-                            {guessCorrect ? "Correct Guess!" : "Incorrect Guess!"}
-                          </span>
+                        <p className="text-gray-300 mb-4">Mr. White gets one chance to guess the Civilians' word:</p>
+                        <div className="flex gap-2 max-w-xs mx-auto mb-4">
+                          <Input
+                            type="text"
+                            className="bg-gray-700 border-gray-600"
+                            placeholder="Enter your guess..."
+                            value={whiteGuess}
+                            onChange={(e) => setWhiteGuess(e.target.value)}
+                          />
+                          <Button onClick={handleSubmitGuess} disabled={!whiteGuess.trim()}>
+                            Guess
+                          </Button>
                         </div>
-                        <p className="text-sm text-gray-300">
-                          {guessCorrect
-                            ? "Mr. White guessed the word correctly and wins the game!"
-                            : "The Civilians win this round!"}
-                        </p>
-                      </div>
-                    </div>
-                  )
-                ) : null}
-              </div>
-            )}
+                      </motion.div>
+                    ) : (
+                      <motion.div 
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="mb-6 space-y-4"
+                      >
+                        <div
+                          className={`p-4 rounded-lg border ${
+                            guessCorrect ? "bg-green-500/20 border-green-500/30" : "bg-red-500/20 border-red-500/30"
+                          }`}
+                        >
+                          <div className="flex items-center justify-center mb-2">
+                            {guessCorrect ? (
+                              <Check className="w-6 h-6 text-green-400 mr-2" />
+                            ) : (
+                              <X className="w-6 h-6 text-red-400 mr-2" />
+                            )}
+                            <span className={`font-bold ${guessCorrect ? "text-green-400" : "text-red-400"}`}>
+                              {guessCorrect ? "Correct Guess!" : "Incorrect Guess!"}
+                            </span>
+                          </div>
+                          <p className="text-sm text-gray-300">
+                            {guessCorrect
+                              ? "Mr. White guessed the word correctly and wins the game!"
+                              : "The Civilians win this round!"}
+                          </p>
+                        </div>
+                      </motion.div>
+                    )
+                  ) : null}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </CardContent>
           <CardFooter>
             {showRole && (player.role !== "Mr. White" || guessSubmitted) && (

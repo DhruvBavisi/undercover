@@ -10,6 +10,7 @@ import { useNavigate } from 'react-router-dom';
 import { Badge } from './ui/badge';
 import { cn } from '../lib/utils';
 import PauseMenu from "./pause-menu";
+import { motion } from "framer-motion";
 
 /**
  * @typedef {Object} Player
@@ -137,8 +138,42 @@ export default function OfflineGameOver({
     }
   };
 
+  // Animation variants
+  const containerVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: { 
+      opacity: 1, 
+      y: 0,
+      transition: { 
+        duration: 0.5, 
+        ease: [0.4, 0, 0.2, 1],
+        staggerChildren: 0.1
+      }
+    },
+    exit: { 
+      opacity: 0, 
+      y: -20,
+      transition: { duration: 0.3, ease: [0.4, 0, 0.2, 1] }
+    }
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 10 },
+    visible: { 
+      opacity: 1, 
+      y: 0,
+      transition: { duration: 0.3, ease: [0.4, 0, 0.2, 1] }
+    }
+  };
+
   return (
-    <div className="animate-fade-in">
+    <motion.div 
+      className="w-full"
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
+      exit="exit"
+    >
       <div className="max-w-4xl mx-auto mb-4 flex justify-end">
         <Button
           variant="outline"
@@ -150,9 +185,9 @@ export default function OfflineGameOver({
         </Button>
       </div>
 
-      <Card className="max-w-4xl mx-auto glass-effect shadow-soft">
+      <Card className="max-w-4xl mx-auto glass-effect shadow-soft overflow-hidden">
         <CardHeader className="text-center pb-2">
-          <div className="flex justify-center mb-4">
+          <motion.div variants={itemVariants} className="flex justify-center mb-4">
             {winnerRole === "Civilians" && (
               <div className="h-16 w-16 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
                 <Users className="h-8 w-8 text-blue-600 dark:text-blue-400" />
@@ -168,30 +203,32 @@ export default function OfflineGameOver({
                 <User className="h-8 w-8 text-purple-600 dark:text-purple-400" />
               </div>
             )}
-          </div>
-          <CardTitle className="text-3xl font-bold mb-2">
-            Game Over
-          </CardTitle>
-          <p className="text-xl text-muted-foreground">
-            {winnerRole === "Civilians" && "The Civilians have won!"}
-            {winnerRole === "Undercover" && "The Undercover Agents have won!"}
-            {winnerRole === "Mr. White" && (
-              whiteGuessCorrect 
-                ? "Mr. White guessed the word correctly and won!" 
-                : "Mr. White is the last player standing and won!"
-            )}
-          </p>
+          </motion.div>
+          <motion.div variants={itemVariants}>
+            <CardTitle className="text-3xl font-bold mb-2">
+              Game Over
+            </CardTitle>
+            <p className="text-xl text-muted-foreground">
+              {winnerRole === "Civilians" && "The Civilians have won!"}
+              {winnerRole === "Undercover" && "The Undercover Agents have won!"}
+              {winnerRole === "Mr. White" && (
+                whiteGuessCorrect 
+                  ? "Mr. White guessed the word correctly and won!" 
+                  : "Mr. White is the last player standing and won!"
+              )}
+            </p>
+          </motion.div>
         </CardHeader>
         
         <CardContent className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-4">
+            <motion.div variants={itemVariants} className="space-y-4">
               <h3 className="text-lg font-semibold flex items-center gap-2">
                 <Trophy className="h-5 w-5 text-primary" />
                 <span>Top Scorer</span>
               </h3>
               {topScorer && topScorer.player && (
-                <div className="flex items-center gap-3 p-4 rounded-lg bg-background/50 border">
+                <div className="flex items-center gap-3 p-4 rounded-lg bg-background/50 border will-change-transform">
                   <Avatar className="h-12 w-12 border-2 border-background">
                     <AvatarImage src={topScorer.player.avatar} alt={topScorer.player.name} />
                     <AvatarFallback className="bg-primary/10 text-primary">
@@ -204,24 +241,24 @@ export default function OfflineGameOver({
                   </div>
                 </div>
               )}
-            </div>
+            </motion.div>
             
-            <div className="space-y-4">
+            <motion.div variants={itemVariants} className="space-y-4">
               <h3 className="text-lg font-semibold">The Words</h3>
               <div className="grid grid-cols-2 gap-3">
-                <div className="p-4 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-900/30">
+                <div className="p-4 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-900/30 will-change-transform">
                   <p className="text-sm text-blue-600 dark:text-blue-400 font-medium mb-1">Civilian Word</p>
                   <p className="text-lg font-bold text-blue-700 dark:text-blue-300">{civilianWord}</p>
                 </div>
-                <div className="p-4 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30">
+                <div className="p-4 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 will-change-transform">
                   <p className="text-sm text-red-600 dark:text-red-400 font-medium mb-1">Undercover Word</p>
                   <p className="text-lg font-bold text-red-700 dark:text-red-300">{undercoverWord}</p>
                 </div>
               </div>
-            </div>
+            </motion.div>
           </div>
           
-          <div>
+          <motion.div variants={itemVariants}>
             <h3 className="text-lg font-semibold mb-3">Player Results</h3>
             <div className="overflow-hidden rounded-lg border">
               <Table>
@@ -234,8 +271,14 @@ export default function OfflineGameOver({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {players.map((player) => (
-                    <TableRow key={player.id} className={player.isEliminated ? "opacity-60" : ""}>
+                  {players.map((player, index) => (
+                    <motion.tr 
+                      key={player.id} 
+                      className={`border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted ${player.isEliminated ? "opacity-60" : ""}`}
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.3 + (index * 0.05), duration: 0.3 }}
+                    >
                       <TableCell className="font-medium">
                         <div className="flex items-center gap-2">
                           <Avatar className="h-8 w-8">
@@ -254,35 +297,37 @@ export default function OfflineGameOver({
                       </TableCell>
                       <TableCell>{player.word || (player.role === "Mr. White" ? "Unknown" : "")}</TableCell>
                       <TableCell className="text-right">{scores?.[player.id] || 0}</TableCell>
-                    </TableRow>
+                    </motion.tr>
                   ))}
                 </TableBody>
               </Table>
             </div>
-          </div>
+          </motion.div>
         </CardContent>
         
-        <CardFooter className="flex flex-wrap gap-3 justify-center pt-2">
-          <Button onClick={onRestart} className="flex items-center gap-2 !bg-blue-600 hover:!bg-blue-700">
-            <RotateCcw className="h-4 w-4" />
-            Play Again
-          </Button>
-          <Button 
-            variant="outline" 
-            onClick={handleAddPlayers} 
-            className="flex items-center gap-2 !bg-blue-600 hover:!bg-blue-700 text-white"
-          >
-            <UserPlus className="h-4 w-4" />
-            Add Player
-          </Button>
-          <Button 
-            variant="ghost" 
-            onClick={handleQuit} 
-            className="flex items-center gap-2 !bg-red-600 hover:!bg-red-700 text-white"
-          >
-            <Home className="h-4 w-4" />
-            Return Home
-          </Button>
+        <CardFooter className="flex flex-wrap gap-3 justify-center pt-2 pb-6">
+          <motion.div variants={itemVariants} className="flex flex-wrap gap-3 justify-center w-full">
+            <Button onClick={onRestart} className="flex items-center gap-2 !bg-blue-600 hover:!bg-blue-700 transition-all hover:scale-105 active:scale-95">
+              <RotateCcw className="h-4 w-4" />
+              Play Again
+            </Button>
+            <Button 
+              variant="outline" 
+              onClick={handleAddPlayers} 
+              className="flex items-center gap-2 !bg-blue-600 hover:!bg-blue-700 text-white transition-all hover:scale-105 active:scale-95"
+            >
+              <UserPlus className="h-4 w-4" />
+              Add Player
+            </Button>
+            <Button 
+              variant="ghost" 
+              onClick={handleQuit} 
+              className="flex items-center gap-2 !bg-red-600 hover:!bg-red-700 text-white transition-all hover:scale-105 active:scale-95"
+            >
+              <Home className="h-4 w-4" />
+              Return Home
+            </Button>
+          </motion.div>
         </CardFooter>
       </Card>
 
@@ -316,6 +361,6 @@ export default function OfflineGameOver({
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+    </motion.div>
   );
 }

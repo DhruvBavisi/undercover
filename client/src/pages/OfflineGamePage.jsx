@@ -12,6 +12,9 @@ import PauseMenu from "../components/pause-menu"
 import { getRandomWordPair, assignRoles, randomizeSpeakingOrder } from "../utils/game-utils"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "../components/ui/dialog"
 import Starfield from "../components/Starfield"
+import { AnimatePresence } from "framer-motion"
+import TransitionWrapper from "../components/transition-wrapper"
+import { useGameHistory } from "../hooks/use-game-history"
 
 /**
  * @typedef {Object} Player
@@ -27,6 +30,7 @@ import Starfield from "../components/Starfield"
 
 export default function OfflineGamePage() {
   const navigate = useNavigate()
+  const { addGameToHistory } = useGameHistory()
   const [gamePhase, setGamePhase] = useState("pass")
   const [players, setPlayers] = useState([])
   const [speakingOrder, setSpeakingOrder] = useState([])
@@ -245,6 +249,32 @@ export default function OfflineGamePage() {
     });
     
     setScores(newScores);
+
+    // Save game to history
+    const durationMs = Date.now() - startTime;
+    const minutes = Math.floor(durationMs / 60000);
+    const seconds = Math.floor((durationMs % 60000) / 1000);
+    const duration = `${minutes}m ${seconds}s`;
+
+    addGameToHistory({
+      winner: winnerRole,
+      duration,
+      players: players.map(p => ({
+        name: p.name,
+        role: p.role,
+        isEliminated: p.isEliminated,
+        score: newScores[p.id]
+      })),
+      words: {
+        civilian: wordPair[0],
+        undercover: wordPair[1]
+      },
+      settings: {
+        undercoverCount: gameSettings.undercoverCount,
+        mrWhiteCount: gameSettings.mrWhiteCount,
+        totalPlayers: players.length
+      }
+    });
   }
 
   const handleRestart = () => {
@@ -329,49 +359,61 @@ export default function OfflineGamePage() {
     return (
       <div className="min-h-screen relative overflow-hidden bg-transparent">
         <Starfield />
-        <div className="relative z-10">
-          {gamePhase === "pass" && (
-            <OfflinePassDevice
-              playerName={players[currentPlayerIndex].name}
-              playerAvatar={players[currentPlayerIndex].avatar}
-              onContinue={() => setGamePhase("reveal")}
-            />
-          )}
-          {gamePhase === "reveal" && (
-            <OfflineRoleReveal
-              player={players[currentPlayerIndex]}
-              onComplete={handleRoleRevealComplete}
-            />
-          )}
-          {gamePhase === "voting" && (
-            <OfflineVoting
-              players={players}
-              speakingOrder={speakingOrder}
-              onVoteComplete={handleVoteComplete}
-              round={round}
-            />
-          )}
-          {gamePhase === "elimination" && (
-            <OfflineElimination
-              player={players.find((p) => p.id === eliminatedPlayerId)}
-              onComplete={handleEliminationComplete}
-              onUndo={handleUndoElimination}
-              onWhiteGuess={handleWhiteGuess}
-              civilianWord={wordPair[0]}
-            />
-          )}
-          {gamePhase === "gameOver" && (
-            <OfflineGameOver
-              players={players}
-              civilianWord={wordPair[0]}
-              undercoverWord={wordPair[1]}
-              scores={scores}
-              whiteGuessCorrect={whiteGuessCorrect}
-              onRestart={handleRestart}
-              onAddPlayer={handleAddPlayer}
-              onQuit={handleQuit}
-            />
-          )}
+        <div className="relative z-10 w-full">
+          <AnimatePresence mode="wait">
+            {gamePhase === "pass" && (
+              <TransitionWrapper key="pass" id="pass">
+                <OfflinePassDevice
+                  playerName={players[currentPlayerIndex].name}
+                  playerAvatar={players[currentPlayerIndex].avatar}
+                  onContinue={() => setGamePhase("reveal")}
+                />
+              </TransitionWrapper>
+            )}
+            {gamePhase === "reveal" && (
+              <TransitionWrapper key="reveal" id="reveal">
+                <OfflineRoleReveal
+                  player={players[currentPlayerIndex]}
+                  onComplete={handleRoleRevealComplete}
+                />
+              </TransitionWrapper>
+            )}
+            {gamePhase === "voting" && (
+              <TransitionWrapper key="voting" id="voting">
+                <OfflineVoting
+                  players={players}
+                  speakingOrder={speakingOrder}
+                  onVoteComplete={handleVoteComplete}
+                  round={round}
+                />
+              </TransitionWrapper>
+            )}
+            {gamePhase === "elimination" && (
+              <TransitionWrapper key="elimination" id="elimination">
+                <OfflineElimination
+                  player={players.find((p) => p.id === eliminatedPlayerId)}
+                  onComplete={handleEliminationComplete}
+                  onUndo={handleUndoElimination}
+                  onWhiteGuess={handleWhiteGuess}
+                  civilianWord={wordPair[0]}
+                />
+              </TransitionWrapper>
+            )}
+            {gamePhase === "gameOver" && (
+              <TransitionWrapper key="gameOver" id="gameOver">
+                <OfflineGameOver
+                  players={players}
+                  civilianWord={wordPair[0]}
+                  undercoverWord={wordPair[1]}
+                  scores={scores}
+                  whiteGuessCorrect={whiteGuessCorrect}
+                  onRestart={handleRestart}
+                  onAddPlayer={handleAddPlayer}
+                  onQuit={handleQuit}
+                />
+              </TransitionWrapper>
+            )}
+          </AnimatePresence>
         </div>
       </div>
     )
