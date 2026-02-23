@@ -98,8 +98,6 @@ export default function OfflineVoting({
                         key={player.id}
                         variants={itemVariants}
                         layoutId={`player-${player.id}`}
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
                       >
                         <Button
                           variant="outline"
@@ -126,13 +124,6 @@ export default function OfflineVoting({
                               <span>{index + 1}</span>
                             </div>
                             <div className="flex-grow truncate font-medium">{player.name}</div>
-                            {isSelected && (
-                              <motion.div
-                                initial={{ scale: 0, opacity: 0 }}
-                                animate={{ scale: 1, opacity: 1 }}
-                                className="h-3 w-3 rounded-full bg-purple-500 ml-2"
-                              />
-                            )}
                           </div>
                         </Button>
                       </motion.div>

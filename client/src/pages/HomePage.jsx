@@ -281,7 +281,7 @@ export default function HomePage() {
                       style={{ background: "var(--gradient-primary)" }}
                       className="hover:opacity-90 transition-opacity"
                     >
-                      <User className="h-4 w-4" />
+                      <User className="h-4 w-4 text-white" fill="white" />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-56">
@@ -320,30 +320,6 @@ export default function HomePage() {
             <div className="glass-effect rounded-2xl p-8 shadow-soft card-hover custom-opacity">
               <div className="flex flex-col items-center text-center space-y-6">
                 <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
-                  <Fingerprint className="h-8 w-8 text-primary" />
-                </div>
-                <h2 className="text-2xl font-bold">Online Play</h2>
-                <p className="text-muted-foreground">
-                  Play with friends or strangers online. Create a room and share the code, or join an existing game.
-                </p>
-                <div className="grid grid-cols-1 gap-3 w-full">
-                  <Link to={isAuthenticated ? "/create" : "/login"}>
-                    <Button className="w-full" style={{ background: "var(--gradient-primary)" }}>
-                      Create Game
-                    </Button>
-                  </Link>
-                  <Link to={isAuthenticated ? "/join" : "/login"}>
-                    <Button className="w-full" variant="outline">
-                      Join Game
-                    </Button>
-                  </Link>
-                </div>
-              </div>
-            </div>
-
-            <div className="glass-effect rounded-2xl p-8 shadow-soft card-hover custom-opacity">
-              <div className="flex flex-col items-center text-center space-y-6">
-                <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
                   <Smartphone className="h-8 w-8 text-primary" />
                 </div>
                 <h2 className="text-2xl font-bold">Offline Play</h2>
@@ -361,6 +337,30 @@ export default function HomePage() {
                   >
                     History
                   </Button>
+                </div>
+              </div>
+            </div>
+
+            <div className="glass-effect rounded-2xl p-8 shadow-soft card-hover custom-opacity">
+              <div className="flex flex-col items-center text-center space-y-6">
+                <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Fingerprint className="h-8 w-8 text-primary" />
+                </div>
+                <h2 className="text-2xl font-bold">Online Play</h2>
+                <p className="text-muted-foreground">
+                  Play with friends or strangers online. Create a room and share the code, or join an existing game.
+                </p>
+                <div className="grid grid-cols-1 gap-3 w-full">
+                  <Link to={isAuthenticated ? "/create" : "/login"}>
+                    <Button className="w-full" style={{ background: "var(--gradient-primary)" }}>
+                      Create Game
+                    </Button>
+                  </Link>
+                  <Link to={isAuthenticated ? "/join" : "/login"}>
+                    <Button className="w-full" variant="outline">
+                      Join Game
+                    </Button>
+                  </Link>
                 </div>
               </div>
             </div>

@@ -104,7 +104,7 @@ export default function OfflineGamePage() {
   }
 
   const handleVoteComplete = (playerId) => {
-    if (!eliminatedPlayerId) { // Ensure only one player is eliminated per round
+    if (eliminatedPlayerId === null) { // Ensure only one player is eliminated per round
       setEliminatedPlayerId(playerId)
       setPlayers(players.map((player) => (player.id === playerId ? { ...player, isEliminated: true } : player)))
       setGamePhase("elimination")
@@ -113,7 +113,7 @@ export default function OfflineGamePage() {
 
   const handleUndoElimination = () => {
     // Revert the elimination
-    if (eliminatedPlayerId) {
+    if (eliminatedPlayerId !== null) {
       setPlayers(players.map((player) => (player.id === eliminatedPlayerId ? { ...player, isEliminated: false } : player)))
       setEliminatedPlayerId(null)
       setGamePhase("voting")
@@ -362,21 +362,18 @@ export default function OfflineGamePage() {
         <div className="relative z-10 w-full">
           <AnimatePresence mode="wait">
             {gamePhase === "pass" && (
-              <TransitionWrapper key="pass" id="pass">
-                <OfflinePassDevice
-                  playerName={players[currentPlayerIndex].name}
-                  playerAvatar={players[currentPlayerIndex].avatar}
-                  onContinue={() => setGamePhase("reveal")}
-                />
-              </TransitionWrapper>
+              <OfflinePassDevice
+                key="pass"
+                playerName={players[currentPlayerIndex].name}
+                onContinue={() => setGamePhase("reveal")}
+              />
             )}
             {gamePhase === "reveal" && (
-              <TransitionWrapper key="reveal" id="reveal">
-                <OfflineRoleReveal
-                  player={players[currentPlayerIndex]}
-                  onComplete={handleRoleRevealComplete}
-                />
-              </TransitionWrapper>
+              <OfflineRoleReveal
+                key="reveal"
+                player={players[currentPlayerIndex]}
+                onComplete={handleRoleRevealComplete}
+              />
             )}
             {gamePhase === "voting" && (
               <TransitionWrapper key="voting" id="voting">
