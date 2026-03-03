@@ -629,6 +629,21 @@ io.on('connection', (socket) => {
           messages: gameRoom.messages || [],
           speakingOrder: gameRoom.rounds?.length > 0 ? gameRoom.rounds[gameRoom.currentRound - 1]?.speakingOrder : [],
         });
+
+        // If game already started, push current state to this player only
+        if (gameRoom.status === 'in-progress') {
+          const currentRoundData = gameRoom.rounds[gameRoom.currentRound - 1];
+
+          socket.emit('game-started', {
+            gameCode: gameRoom.roomCode,
+            status: gameRoom.status,
+            currentPhase: gameRoom.currentPhase,
+            currentRound: gameRoom.currentRound,
+            speakingOrder: currentRoundData?.speakingOrder || [],
+            playerTurn: currentRoundData?.playerTurn || null,
+            message: 'Game is already in progress'
+          });
+        }
       }
     } catch (error) {
       console.error('Error joining room:', error);

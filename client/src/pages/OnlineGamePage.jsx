@@ -505,6 +505,20 @@ const OnlineGamePage = () => {
     };
   }, [socket, room]);
 
+  useEffect(() => {
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState === 'visible' && room?.roomCode) {
+        await fetchRoom(room.roomCode);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [room?.roomCode, fetchRoom]);
+
   // Add chat message submission handler
   const handleChatSubmit = (e) => {
     e.preventDefault();
