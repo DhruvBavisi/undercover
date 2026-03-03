@@ -1,0 +1,51 @@
+Connected to DB
+Pushing message: {
+  id: '1772406454497',
+  playerName: 'Tester',
+  playerId: new ObjectId('69a4c6b60ff652908864ce63'),
+  content: 'Test message',
+  isDescription: false,
+  isSystem: false,
+  timestamp: 2026-03-01T23:07:34.497Z
+}
+Test Failed: CastError: Cast to string failed for value "{
+  id: '1772406454497',
+  playerName: 'Tester',
+  playerId: new ObjectId('69a4c6b60ff652908864ce63'),
+  content: 'Test message',
+  isDescription: false,
+  isSystem: false,
+  timestamp: 2026-03-01T23:07:34.497Z
+}" (type Object) at path "messages"
+    at SchemaString.cast (C:\Users\dhruv\OneDrive\Desktop\React\un-cv - Copy (2)\server\node_modules\mongoose\lib\schema\string.js:607:11)
+    at SchemaType.applySetters (C:\Users\dhruv\OneDrive\Desktop\React\un-cv - Copy (2)\server\node_modules\mongoose\lib\schemaType.js:1255:12)
+    at Proxy._cast (C:\Users\dhruv\OneDrive\Desktop\React\un-cv - Copy (2)\server\node_modules\mongoose\lib\types\array\methods\index.js:250:43)
+    at Proxy._mapCast (C:\Users\dhruv\OneDrive\Desktop\React\un-cv - Copy (2)\server\node_modules\mongoose\lib\types\array\methods\index.js:263:17)
+    at Arguments.map (<anonymous>)
+    at Proxy.push (C:\Users\dhruv\OneDrive\Desktop\React\un-cv - Copy (2)\server\node_modules\mongoose\lib\types\array\methods\index.js:697:21)
+    at testDB (file:///C:/Users/dhruv/OneDrive/Desktop/React/un-cv%20-%20Copy%20(2)/server/test-db.js:35:23)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5) {
+  stringValue: '"{\n' +
+    "  id: '1772406454497',\n" +
+    "  playerName: 'Tester',\n" +
+    "  playerId: new ObjectId('69a4c6b60ff652908864ce63'),\n" +
+    "  content: 'Test message',\n" +
+    '  isDescription: false,\n' +
+    '  isSystem: false,\n' +
+    '  timestamp: 2026-03-01T23:07:34.497Z\n' +
+    '}"',
+  messageFormat: undefined,
+  kind: 'string',
+  value: {
+    id: '1772406454497',
+    playerName: 'Tester',
+    playerId: new ObjectId('69a4c6b60ff652908864ce63'),
+    content: 'Test message',
+    isDescription: false,
+    isSystem: false,
+    timestamp: 2026-03-01T23:07:34.497Z
+  },
+  path: 'messages',
+  reason: null,
+  valueType: 'Object'
+}

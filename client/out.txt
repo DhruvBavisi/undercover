@@ -1,0 +1,7 @@
+--- STARTING CHAT HISTORY SIMULATION ---
+Γ£à Room Created: JHKJUF
+Sending chat messages...
+Fetching standalone chat payload for late joiner...
+Payload received by Late Joiner -> Messages count: 0
+
+Γ¥î TEST FAILED: Missing specific chat messages in REST payload fetch.

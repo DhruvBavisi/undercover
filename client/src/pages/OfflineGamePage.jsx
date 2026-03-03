@@ -62,20 +62,20 @@ export default function OfflineGamePage() {
         const playerCount = playerNames.length
         const selectedWordPair = getRandomWordPair(settings.wordCategory)
         setWordPair(selectedWordPair)
-        
+
         // Get players and speaking order from the assignRoles function
         const { players: initialPlayers, speakingOrder: initialOrder } = assignRoles(
-          playerNames, 
-          playerCount, 
-          settings.includeWhite, 
+          playerNames,
+          playerCount,
+          settings.includeWhite,
           selectedWordPair,
           settings.undercoverCount,
           settings.mrWhiteCount
         )
-        
+
         setPlayers(initialPlayers)
         setSpeakingOrder(randomizeSpeakingOrder(initialPlayers, 1))
-        
+
         // Initialize scores
         const initialScores = {}
         initialPlayers.forEach((player) => {
@@ -150,12 +150,12 @@ export default function OfflineGamePage() {
 
     // Update scores based on elimination and survival
     const newScores = { ...scores };
-    
+
     // 1. Base points for surviving the round
     remainingPlayers.forEach((player) => {
       newScores[player.id] = (newScores[player.id] || 0) + 1; // 1 point for surviving
     });
-    
+
     // 2. Points for eliminating specific roles
     if (eliminatedPlayer?.role === "Undercover") {
       remainingPlayers.forEach((player) => {
@@ -177,14 +177,14 @@ export default function OfflineGamePage() {
         }
       });
     }
-    
+
     // 3. Extra points for Undercover players for surviving each round
     remainingPlayers.forEach((player) => {
       if (player.role === "Undercover") {
         newScores[player.id] += 1; // 1 extra point for Undercover survival
       }
     });
-    
+
     setScores(newScores);
 
     // Check game-over conditions
@@ -218,7 +218,7 @@ export default function OfflineGamePage() {
     const remainingUndercover = remainingPlayers.filter(p => p.role === "Undercover");
     const remainingMrWhite = remainingPlayers.filter(p => p.role === "Mr. White");
     const eliminatedMrWhite = players.filter(p => p.isEliminated && p.role === "Mr. White");
-    
+
     // Determine the winning team
     let winnerRole = "Civilians";
     if (remainingCivilians.length <= remainingUndercover.length) {
@@ -228,9 +228,9 @@ export default function OfflineGamePage() {
     } else if (eliminatedMrWhite.length > 0 && whiteGuessCorrect) {
       winnerRole = "Mr. White";
     }
-    
+
     const newScores = { ...scores };
-    
+
     // Award bonus points to the winning team
     players.forEach((player) => {
       // Bonus points for winning team
@@ -241,13 +241,13 @@ export default function OfflineGamePage() {
       ) {
         newScores[player.id] += 3; // 3 bonus points for being on winning team
       }
-      
+
       // Extra bonus for Undercover victory
       if (winnerRole === "Undercover" && player.role === "Undercover") {
         newScores[player.id] += 2; // 2 extra points for Undercover victory
       }
     });
-    
+
     setScores(newScores);
 
     // Save game to history
@@ -321,13 +321,13 @@ export default function OfflineGamePage() {
       name: player.name,
       id: player.id
     }));
-    
+
     // Navigate to setup with current players
-    navigate('/offline', { 
-      state: { 
+    navigate('/offline', {
+      state: {
         players: currentPlayers,
         fromGame: true
-      } 
+      }
     });
   };
 
@@ -422,19 +422,21 @@ export default function OfflineGamePage() {
       <div className="relative z-10">
         {renderGamePhase()}
       </div>
-      <div className="absolute top-4 right-4 flex items-center gap-4 z-50">
-        <Badge variant="outline" className="text-lg py-1 px-3 bg-gray-800/70">
-          Round {round}
-        </Badge>
-        <Button
-          variant="outline"
-          size="icon"
-          className="h-9 w-9 bg-gray-800/70"
-          onClick={() => setIsPaused(true)}
-        >
-          <Pause className="h-4 w-4" />
-        </Button>
-      </div>
+      {gamePhase !== "gameOver" && (
+        <div className="absolute top-4 right-4 sm:top-6 sm:right-6 flex items-center gap-3 sm:gap-4 z-50">
+          <Badge variant="outline" className="text-sm sm:text-lg py-1 px-2 sm:px-3 bg-gray-800/70">
+            Round {round}
+          </Badge>
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-10 w-10 bg-gray-800/70 rounded-full"
+            onClick={() => setIsPaused(true)}
+          >
+            <Pause className="h-5 w-5" />
+          </Button>
+        </div>
+      )}
       <PauseMenu
         isOpen={isPaused}
         onClose={() => setIsPaused(false)}

@@ -1,22 +1,22 @@
 import { Link, useNavigate } from "react-router-dom"
 import { useAuth } from "../context/AuthContext"
 import { Button } from "../components/ui/button"
-import { 
-  Fingerprint, 
-  Users, 
-  Trophy, 
-  Info, 
-  Smartphone, 
+import {
+  Fingerprint,
+  Users,
+  Trophy,
+  Info,
+  Smartphone,
   User,
   LogOut,
-  Calendar, 
-  Clock, 
-  Search, 
-  Trash2, 
+  Calendar,
+  Clock,
+  Search,
+  Trash2,
   X
 } from "lucide-react"
 import { avatarOptions } from '../utils/avatars';
-import { 
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -224,19 +224,20 @@ export default function HomePage() {
     <div className="min-h-screen text-foreground animate-fade-in relative overflow-hidden bg-transparent">
       {/* Starfield background */}
       <Starfield />
-      
+
       {/* Animated background circles */}
       <BackgroundCircles />
-      
+
       {/* Header with navigation */}
       <header className="fixed top-0 left-0 right-0 z-50 backdrop-blur-sm bg-background/30 border-b border-border/20">
         <div className="container mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
             {/* Logo/Brand */}
-            <Link to="/" className="flex items-center">
-              <h1 className="text-xl font-bold gradient-text italic">CU</h1>
+            <Link to="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+              <img src="/avatars/un_nav.png" alt="Code Undercover Logo" className="h-12 sm:h-15 md:h-14 lg:h-16 w-auto object-contain border border-indigo-500/50 rounded-full p-1 bg-indigo-500/5 shadow-[0_0_10px_rgba(99,102,241,0.2)]" />
+              {/* <h1 className="text-xl font-bold gradient-text italic hidden sm:block">Code Undercover</h1> */}
             </Link>
-            
+
             {/* Navigation Links */}
             <div className="flex items-center gap-6">
               <Link to="/how-to-play">
@@ -244,17 +245,17 @@ export default function HomePage() {
                   How to Play
                 </Button>
               </Link>
-              
+
               {/* Account Menu */}
               {isAuthenticated ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="rounded-full p-0 h-10 w-10 overflow-hidden profile-picture-container hover:bg-background/50">
-                      <div className={`h-full w-full bg-gradient-to-r ${currentAvatar.bgColor} flex items-center justify-center`}>
-                        <img 
-                          src={currentAvatar.image} 
+                    <Button variant="ghost" className={`rounded-xl p-0 h-10 w-10 profile-picture-container hover:bg-background/50 ${currentAvatar.bgColor}`}>
+                      <div className={`h-full w-full flex items-center justify-center rounded-xl overflow-hidden`}>
+                        <img
+                          src={currentAvatar.image}
                           alt={currentAvatar.name}
-                          className="w-[75%] h-[75%] object-contain"
+                          className="w-full h-full object-cover scale-125"
                         />
                       </div>
                     </Button>
@@ -277,7 +278,7 @@ export default function HomePage() {
               ) : (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button 
+                    <Button
                       style={{ background: "var(--gradient-primary)" }}
                       className="hover:opacity-90 transition-opacity"
                     >
@@ -307,17 +308,22 @@ export default function HomePage() {
 
       <div className="container mx-auto px-4 pt-24 pb-16 relative z-10">
         <section className="py-16 md:py-24">
-          <div className="max-w-3xl mx-auto text-center mb-16 animate-slide-up">
-            <h1 className="text-5xl md:text-6xl font-bold mb-6 gradient-text">
+          <div className="max-w-3xl mx-auto text-center mb-16 animate-slide-up flex flex-col items-center">
+            <img
+              src="/avatars/un_logo.png"
+              alt="Code Undercover Logo"
+              className="block h-40 md:h-64 lg:h-80 w-auto object-contain mb-6 drop-shadow-[0_0_15px_rgba(79,70,229,0.5)]"
+            />
+            {/* <h1 className="text-5xl md:text-6xl font-bold mb-6 gradient-text">
               Code Undercover
-            </h1>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+            </h1> */}
+            <p className="text-xl max-w-2xl mx-auto font-medium gradient-cool-text">
               A real-time social deduction game of strategy, deception, and detective work
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
-            <div className="glass-effect rounded-2xl p-8 shadow-soft card-hover custom-opacity">
+            <div className="bg-gray-900/50 backdrop-blur-sm border border-gray-700 rounded-2xl p-8 shadow-2xl card-hover">
               <div className="flex flex-col items-center text-center space-y-6">
                 <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
                   <Smartphone className="h-8 w-8 text-primary" />
@@ -330,8 +336,8 @@ export default function HomePage() {
                   <Link to="/offline">
                     <Button className="w-full" style={{ background: "var(--gradient-cool)" }}>Start Offline Game</Button>
                   </Link>
-                  <Button 
-                    className="w-full" 
+                  <Button
+                    className="w-full"
                     variant="outline"
                     onClick={() => navigate('/history')}
                   >
@@ -341,14 +347,14 @@ export default function HomePage() {
               </div>
             </div>
 
-            <div className="glass-effect rounded-2xl p-8 shadow-soft card-hover custom-opacity">
+            <div className="bg-gray-900/50 backdrop-blur-sm border border-gray-700 rounded-2xl p-8 shadow-2xl card-hover">
               <div className="flex flex-col items-center text-center space-y-6">
                 <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
                   <Fingerprint className="h-8 w-8 text-primary" />
                 </div>
                 <h2 className="text-2xl font-bold">Online Play</h2>
                 <p className="text-muted-foreground">
-                  Play with friends or strangers online. Create a room and share the code, or join an existing game.
+                  Play with friends online. Create a room and share the code, or join an existing game.
                 </p>
                 <div className="grid grid-cols-1 gap-3 w-full">
                   <Link to={isAuthenticated ? "/create" : "/login"}>
@@ -370,7 +376,7 @@ export default function HomePage() {
         <section className="py-16">
           <h2 className="text-3xl font-bold text-center mb-12 gradient-text">Game Features</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-            <div className="glass-effect rounded-xl p-6 card-hover custom-opacity">
+            <div className="bg-gray-900/50 backdrop-blur-md border border-gray-700 rounded-xl p-6 shadow-2xl card-hover">
               <div className="flex flex-col items-center text-center">
                 <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
                   <Users className="h-6 w-6 text-primary" />
@@ -382,7 +388,7 @@ export default function HomePage() {
               </div>
             </div>
 
-            <div className="glass-effect rounded-xl p-6 card-hover custom-opacity">
+            <div className="bg-gray-900/50 backdrop-blur-md border border-gray-700 rounded-xl p-6 shadow-2xl card-hover">
               <div className="flex flex-col items-center text-center">
                 <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
                   <Trophy className="h-6 w-6 text-primary" />
@@ -394,7 +400,7 @@ export default function HomePage() {
               </div>
             </div>
 
-            <div className="glass-effect rounded-xl p-6 card-hover custom-opacity">
+            <div className="bg-gray-900/50 backdrop-blur-md border border-gray-700 rounded-xl p-6 shadow-2xl card-hover">
               <div className="flex flex-col items-center text-center">
                 <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
                   <Info className="h-6 w-6 text-primary" />

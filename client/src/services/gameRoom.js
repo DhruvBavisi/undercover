@@ -69,7 +69,7 @@ export const joinRoom = async (roomCode, token) => {
 export const getRoom = async (roomCode, token) => {
   try {
     console.log(`API URL: ${API_URL}/game-rooms/rooms/${roomCode}`);
-    
+
     const response = await fetch(`${API_URL}/game-rooms/rooms/${roomCode}`, {
       method: 'GET',
       headers: {
@@ -92,6 +92,35 @@ export const getRoom = async (roomCode, token) => {
     return await response.json();
   } catch (error) {
     console.error('Error getting room:', error);
+    throw error;
+  }
+};
+
+// Fetch room messages
+export const fetchRoomMessages = async (roomCode, token) => {
+  try {
+    const response = await fetch(`${API_URL}/game-rooms/rooms/${roomCode}/messages`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      },
+      credentials: 'include'
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Error fetching messages:', errorText);
+      try {
+        const errorData = JSON.parse(errorText);
+        throw new Error(errorData.message || 'Failed to fetch messages');
+      } catch (parseError) {
+        throw new Error(`Failed to fetch messages: ${response.status} ${response.statusText}`);
+      }
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching messages:', error);
     throw error;
   }
 };
@@ -134,7 +163,7 @@ export const leaveRoom = async (roomCode, token) => {
   try {
     console.log(`Leaving room with API URL: ${API_URL}/game-rooms/rooms/${roomCode}/leave`);
     const response = await fetch(`${API_URL}/game-rooms/rooms/${roomCode}/leave`, {
-      method: 'POST',
+      method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`
@@ -165,12 +194,12 @@ export const updateSettings = async (roomCode, settings, token) => {
   try {
     console.log(`Updating settings with API URL: ${API_URL}/game-rooms/rooms/${roomCode}/settings`);
     const response = await fetch(`${API_URL}/game-rooms/rooms/${roomCode}/settings`, {
-      method: 'PUT',
+      method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`
       },
-      body: JSON.stringify(settings),
+      body: JSON.stringify({ settings }),
       credentials: 'include'
     });
 

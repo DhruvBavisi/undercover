@@ -33,12 +33,12 @@ import {
 import { ScrollArea } from "../components/ui/scroll-area";
 import PauseMenu from "../components/pause-menu";
 import { getRandomWordPair, assignRoles, randomizeSpeakingOrder } from "../utils/game-utils";
-import { 
-  getRecommendedRoles, 
-  calculateRounds, 
-  getMaxUndercover, 
-  getMaxMrWhite, 
-  getMinCivilians 
+import {
+  getRecommendedRoles,
+  calculateRounds,
+  getMaxUndercover,
+  getMaxMrWhite,
+  getMinCivilians
 } from "../utils/roleDistribution";
 
 // DnD Imports
@@ -75,32 +75,32 @@ const generateId = () => {
 
 // Utility to generate initials from name
 const getInitials = (name) => {
-    if (!name) return "?";
-    return name
-        .split(' ')
-        .map(word => word.charAt(0))
-        .join('')
-        .toUpperCase()
-        .slice(0, 2);
+  if (!name) return "?";
+  return name
+    .split(' ')
+    .map(word => word.charAt(0))
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
 };
 
 // Utility to generate consistent color from string
 const getAvatarColor = (name) => {
-    if (!name) return "bg-gray-600";
-    const colors = [
-        "bg-red-500", "bg-orange-500", "bg-amber-500", "bg-yellow-500", 
-        "bg-lime-500", "bg-green-500", "bg-emerald-500", "bg-teal-500", 
-        "bg-cyan-500", "bg-sky-500", "bg-blue-500", "bg-indigo-500", 
-        "bg-violet-500", "bg-purple-500", "bg-fuchsia-500", "bg-pink-500", "bg-rose-500"
-    ];
-    
-    let hash = 0;
-    for (let i = 0; i < name.length; i++) {
-        hash = name.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    
-    const index = Math.abs(hash) % colors.length;
-    return colors[index];
+  if (!name) return "bg-gray-600";
+  const colors = [
+    "bg-red-500", "bg-orange-500", "bg-amber-500", "bg-yellow-500",
+    "bg-lime-500", "bg-green-500", "bg-emerald-500", "bg-teal-500",
+    "bg-cyan-500", "bg-sky-500", "bg-blue-500", "bg-indigo-500",
+    "bg-violet-500", "bg-purple-500", "bg-fuchsia-500", "bg-pink-500", "bg-rose-500"
+  ];
+
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+
+  const index = Math.abs(hash) % colors.length;
+  return colors[index];
 };
 
 // Sortable Player Row Component
@@ -124,103 +124,102 @@ function SortablePlayerRow({ id, index, value, error, onChange, onBlur, onRemove
 
   return (
     <div ref={setNodeRef} style={style} className="flex flex-col mb-3">
-        <div className={`flex items-center gap-2 ${isDragging ? 'shadow-lg ring-2 ring-purple-500 rounded-md' : ''}`}>
-            <div 
-                {...attributes} 
-                {...listeners} 
-                className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-white flex-shrink-0 p-2 touch-none"
-            >
-                <GripVertical size={20} />
-            </div>
-            <div className="bg-gray-700/50 h-10 w-8 rounded-l-md flex items-center justify-center flex-shrink-0 font-medium text-gray-300 border-r border-gray-600">
-                {index + 1}
-            </div>
-            <Input
-                ref={inputRef}
-                placeholder={`Player ${index + 1}`}
-                value={value}
-                onChange={onChange}
-                onBlur={onBlur}
-                onKeyDown={onKeyDown}
-                className="bg-gray-700 border-gray-600 rounded-l-none focus-visible:ring-offset-0"
-            />
-            <Button
-                variant="secondary"
-                size="icon"
-                className="bg-purple-700 border-gray-600 hover:bg-purple-600 flex-shrink-0"
-                onClick={onRemove}
-            >
-                <Minus className="h-4 w-4" />
-            </Button>
+      <div className={`flex items-center gap-2 ${isDragging ? 'shadow-lg ring-2 ring-purple-500 rounded-md' : ''}`}>
+        <div
+          {...attributes}
+          {...listeners}
+          className="cursor-grab active:cursor-grabbing text-gray-400 hover:text-white flex-shrink-0 p-2 touch-none"
+        >
+          <GripVertical size={20} />
         </div>
-        {error && (
-            <p className="text-red-500 text-sm mt-1 ml-10">{error}</p>
-        )}
+        <div className="bg-gray-700/50 h-10 w-8 rounded-l-md flex items-center justify-center flex-shrink-0 font-medium text-gray-300 border-r border-gray-600">
+          {index + 1}
+        </div>
+        <Input
+          ref={inputRef}
+          placeholder={`Player ${index + 1}`}
+          value={value}
+          onChange={onChange}
+          onBlur={onBlur}
+          onKeyDown={onKeyDown}
+          className="bg-gray-700 border-gray-600 rounded-l-none focus-visible:ring-offset-0"
+        />
+        <Button
+          variant="secondary"
+          size="icon"
+          className="bg-purple-700 border-gray-600 hover:bg-purple-600 flex-shrink-0"
+          onClick={onRemove}
+        >
+          <Minus className="h-4 w-4" />
+        </Button>
+      </div>
+      {error && (
+        <p className="text-red-500 text-sm mt-1 ml-10">{error}</p>
+      )}
     </div>
   );
 }
 
-    // Sortable Row for Load Group Dialog
-    function SortableDialogRow({ id, name, index, onRemove, style: customStyle }) {
-        const {
-        attributes,
-        listeners,
-        setNodeRef,
-        transform,
-        transition,
-        isDragging,
-        } = useSortable({ id });
-    
-        const style = {
-        transform: CSS.Transform.toString(transform),
-        transition,
-        zIndex: isDragging ? 50 : "auto",
-        position: "relative",
-        opacity: isDragging ? 0.5 : 1, // Visual feedback during drag
-        ...customStyle,
-        };
-    
-        return (
-        <div 
-            ref={setNodeRef} 
-            style={style} 
-            data-player-name={name}
-            className={`flex items-center gap-3 bg-gray-800 p-3 rounded-md border mb-2 select-none transition-colors group ${
-                isDragging ? 'shadow-lg ring-2 ring-purple-500 border-purple-500' : 'border-gray-700 hover:border-gray-500'
-            }`}
-        >
-            <div 
-                {...attributes} 
-                {...listeners} 
-                className="cursor-grab active:cursor-grabbing text-gray-500 hover:text-gray-300 flex-shrink-0 p-1 touch-none"
-            >
-                <GripVertical size={20} />
-            </div>
-            <div className="bg-gray-700/50 w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-medium text-gray-400">
-                {index + 1}
-            </div>
-            <span className="flex-1 truncate text-base font-medium text-gray-200">{name}</span>
-            <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 text-gray-400 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
-                onClick={(e) => {
-                    e.stopPropagation(); // Prevent drag start if clicked
-                    onRemove();
-                }}
-            >
-                <Minus className="h-4 w-4" />
-            </Button>
-        </div>
-        );
-    }
+// Sortable Row for Load Group Dialog
+function SortableDialogRow({ id, name, index, onRemove, style: customStyle }) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 50 : "auto",
+    position: "relative",
+    opacity: isDragging ? 0.5 : 1, // Visual feedback during drag
+    ...customStyle,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      data-player-name={name}
+      className={`flex items-center gap-3 bg-gray-800 p-3 rounded-md border mb-2 select-none transition-colors group ${isDragging ? 'shadow-lg ring-2 ring-purple-500 border-purple-500' : 'border-gray-700 hover:border-gray-500'
+        }`}
+    >
+      <div
+        {...attributes}
+        {...listeners}
+        className="cursor-grab active:cursor-grabbing text-gray-500 hover:text-gray-300 flex-shrink-0 p-1 touch-none"
+      >
+        <GripVertical size={20} />
+      </div>
+      <div className="bg-gray-700/50 w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-medium text-gray-400">
+        {index + 1}
+      </div>
+      <span className="flex-1 truncate text-base font-medium text-gray-200">{name}</span>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-8 w-8 text-gray-400 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+        onClick={(e) => {
+          e.stopPropagation(); // Prevent drag start if clicked
+          onRemove();
+        }}
+      >
+        <Minus className="h-4 w-4" />
+      </Button>
+    </div>
+  );
+}
 
 export default function OfflinePage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { players: initialPlayers = [], fromGame = false } = location.state || {};
   const { toast } = useToast();
-  
+
   // Initialize state with existing players if coming from game
   const [playerCount, setPlayerCount] = useState(() => {
     // First check location state
@@ -233,7 +232,7 @@ export default function OfflinePage() {
   const [undercoverCount, setUndercoverCount] = useState(1);
   const [mrWhiteCount, setMrWhiteCount] = useState(0);
   const [wordCategory, setWordCategory] = useState("general");
-  
+
   // Initialize players state
   const [players, setPlayers] = useState(() => {
     // First try to get players from location state
@@ -296,14 +295,14 @@ export default function OfflinePage() {
   useEffect(() => {
     // Check if we're returning from the game page to add more players
     const returnToSetup = localStorage.getItem("returnToSetup");
-    
+
     if (returnToSetup === "true") {
       // Get the existing game settings
       const storedSettings = localStorage.getItem("offlineGameSettings");
       if (storedSettings) {
         try {
           const settings = JSON.parse(storedSettings);
-          
+
           // Update state with existing settings
           if (settings.playerNames && settings.playerNames.length > 0) {
             setPlayers(settings.playerNames);
@@ -311,23 +310,23 @@ export default function OfflinePage() {
             // Update IDs
             setPlayerIds(settings.playerNames.map(() => generateId()));
           }
-          
+
           if (settings.includeWhite !== undefined) {
             setIncludeWhite(settings.includeWhite);
           }
-          
+
           if (settings.undercoverCount !== undefined) {
             setUndercoverCount(settings.undercoverCount);
           }
-          
+
           if (settings.mrWhiteCount !== undefined) {
             setMrWhiteCount(settings.mrWhiteCount);
           }
-          
+
           if (settings.wordCategory) {
             setWordCategory(settings.wordCategory);
           }
-          
+
           if (settings.rounds) {
             setRounds(settings.rounds);
           }
@@ -335,7 +334,7 @@ export default function OfflinePage() {
           console.error("Error loading existing settings:", error);
         }
       }
-      
+
       // Clear the return flag
       localStorage.removeItem("returnToSetup");
     }
@@ -345,7 +344,7 @@ export default function OfflinePage() {
   useEffect(() => {
     const returnToSetup = localStorage.getItem("returnToSetup");
     const storedSettings = localStorage.getItem("offlineGameSettings");
-    
+
     // Use the actual values from location state directly to avoid dependency issues
     const locState = location.state || {};
     const locInitialPlayers = locState.players || [];
@@ -356,7 +355,7 @@ export default function OfflinePage() {
         // Get player data from either source
         let playerData;
         let settings;
-        
+
         if (locInitialPlayers.length > 0) {
           playerData = locInitialPlayers;
         } else {
@@ -371,7 +370,7 @@ export default function OfflinePage() {
           setPlayerCount(playerNames.length);
           setNameErrors(Array(playerNames.length).fill(""));
           setPlayerIds(playerNames.map(() => generateId()));
-          
+
           // Load other settings if available
           if (settings) {
             if (settings.includeWhite !== undefined) setIncludeWhite(settings.includeWhite);
@@ -380,10 +379,10 @@ export default function OfflinePage() {
             if (settings.wordCategory) setWordCategory(settings.wordCategory);
             if (settings.rounds) setRounds(settings.rounds);
           }
-          
+
           // Apply recommended roles
           applyRecommendedRoles(playerNames.length);
-          
+
           // Show success toast
           toast({
             title: "Players Loaded",
@@ -427,19 +426,19 @@ export default function OfflinePage() {
             // If removing, we look for the element in the group list
             // We can try to use the ref if we have the group name
             if (data.groupName) {
-                targetEl = playerRefs.current[`${data.groupName}-${name}`];
+              targetEl = playerRefs.current[`${data.groupName}-${name}`];
             }
             // Fallback to query selector if ref is missing (though ref is preferred)
             if (!targetEl) {
-                // Since we added data-player-name to group items too, we need to be careful.
-                // But since the item was removed from Selected List, the only one remaining with this name
-                // should be the one in the Group List.
-                targetEl = document.querySelector(`[data-player-name="${name}"]`);
+              // Since we added data-player-name to group items too, we need to be careful.
+              // But since the item was removed from Selected List, the only one remaining with this name
+              // should be the one in the Group List.
+              targetEl = document.querySelector(`[data-player-name="${name}"]`);
             }
           } else {
-             // If adding, we look for the element in the selected list
-             // The item in the group list is gone, so the only one is in the selected list.
-             targetEl = document.querySelector(`[data-player-name="${name}"]`);
+            // If adding, we look for the element in the selected list
+            // The item in the group list is gone, so the only one is in the selected list.
+            targetEl = document.querySelector(`[data-player-name="${name}"]`);
           }
 
           if (targetEl) {
@@ -456,22 +455,22 @@ export default function OfflinePage() {
             };
             hasUpdates = true;
           } else if (data.direction === 'removing') {
-              // If target not found when removing (e.g. group collapsed), just fade out
-              // We can set a dummy target or just animate to disappear
-              // For now, let's just clear it to avoid stuck state
-              const groupHeader = document.querySelector(`[data-group-header="${data.groupName}"]`);
-              if (groupHeader) {
-                  const rect = groupHeader.getBoundingClientRect();
-                  updates[name] = {
-                      ...data,
-                      targetRect: { top: rect.top, left: rect.left, width: rect.width, height: rect.height },
-                      status: 'animating'
-                  };
-                  hasUpdates = true;
-              } else {
-                  // Just finish
-                  shouldRemove.push(name);
-              }
+            // If target not found when removing (e.g. group collapsed), just fade out
+            // We can set a dummy target or just animate to disappear
+            // For now, let's just clear it to avoid stuck state
+            const groupHeader = document.querySelector(`[data-group-header="${data.groupName}"]`);
+            if (groupHeader) {
+              const rect = groupHeader.getBoundingClientRect();
+              updates[name] = {
+                ...data,
+                targetRect: { top: rect.top, left: rect.left, width: rect.width, height: rect.height },
+                status: 'animating'
+              };
+              hasUpdates = true;
+            } else {
+              // Just finish
+              shouldRemove.push(name);
+            }
           }
         });
 
@@ -481,13 +480,13 @@ export default function OfflinePage() {
             ...updates
           }));
         }
-        
+
         if (shouldRemove.length > 0) {
-            setAnimatingPlayers(prev => {
-                const newState = { ...prev };
-                shouldRemove.forEach(n => delete newState[n]);
-                return newState;
-            });
+          setAnimatingPlayers(prev => {
+            const newState = { ...prev };
+            shouldRemove.forEach(n => delete newState[n]);
+            return newState;
+          });
         }
       });
     }
@@ -553,7 +552,7 @@ export default function OfflinePage() {
     if (playerCount < 20) { // Changed max to 20 consistent with slider
       const newCount = playerCount + 1;
       setPlayerCount(newCount);
-      
+
       // Only add a new empty player name if we're adding beyond the current list
       if (newCount > players.length) {
         setPlayers([...players, ""]);
@@ -570,42 +569,42 @@ export default function OfflinePage() {
     const name = String(value || '');
     // Only capitalize first letter for display/validation check, but store raw input to allow typing
     // We will auto-capitalize on save or blur if needed, but for now let's keep user input responsive
-    
+
     // Check if name already exists in other player slots (case-insensitive check)
     const isDuplicate = players.some(
-      (existingName, i) => i !== index && 
-      String(existingName || '').trim().toLowerCase() === name.trim().toLowerCase() && 
-      existingName !== ''
+      (existingName, i) => i !== index &&
+        String(existingName || '').trim().toLowerCase() === name.trim().toLowerCase() &&
+        existingName !== ''
     );
-    
+
     // Create new arrays for updating state
     const newPlayerNames = [...players];
     const newNameErrors = [...nameErrors];
-    
+
     if (isDuplicate) {
       newNameErrors[index] = 'Name already exists';
     } else {
       newNameErrors[index] = '';
     }
-    
+
     // Update with raw value to prevent cursor jumping
     newPlayerNames[index] = name;
-    
+
     setPlayers(newPlayerNames);
     setNameErrors(newNameErrors);
   };
-  
+
   const handlePlayerNameBlur = (index) => {
-      // Auto-capitalize on blur
-      const name = players[index] || "";
-      if (name) {
-          const formatted = name.charAt(0).toUpperCase() + name.slice(1);
-          if (formatted !== name) {
-              const newPlayers = [...players];
-              newPlayers[index] = formatted;
-              setPlayers(newPlayers);
-          }
+    // Auto-capitalize on blur
+    const name = players[index] || "";
+    if (name) {
+      const formatted = name.charAt(0).toUpperCase() + name.slice(1);
+      if (formatted !== name) {
+        const newPlayers = [...players];
+        newPlayers[index] = formatted;
+        setPlayers(newPlayers);
       }
+    }
   };
 
   const handleRemovePlayer = (index) => {
@@ -618,7 +617,7 @@ export default function OfflinePage() {
       const updatedErrors = [...nameErrors];
       updatedErrors.splice(index, 1);
       setNameErrors(updatedErrors);
-      
+
       const updatedIds = [...playerIds];
       updatedIds.splice(index, 1);
       setPlayerIds(updatedIds);
@@ -657,15 +656,15 @@ export default function OfflinePage() {
   const handleKeyDown = (event, index) => {
     if (event.key === "Enter") {
       event.preventDefault();
-      
+
       // Prevent progression if there is an error (e.g., duplicate name)
       if (nameErrors[index]) {
-          return;
+        return;
       }
 
       if (index < playerCount - 1) {
         if (inputRefs.current[index + 1]) {
-            inputRefs.current[index + 1].focus();
+          inputRefs.current[index + 1].focus();
         }
       } else {
         // Explicitly blur the input instead of starting game
@@ -679,7 +678,7 @@ export default function OfflinePage() {
     const filteredNames = players
       .map((p) => (typeof p === "string" ? p : p.name || ""))
       .filter((name) => name.trim() !== "");
-    
+
     // Check if we have at least 3 players
     if (filteredNames.length < 3) {
       toast({
@@ -689,7 +688,7 @@ export default function OfflinePage() {
       });
       return;
     }
-    
+
     // Check if there are any duplicate name errors
     if (nameErrors.some((error) => error !== "")) {
       toast({
@@ -699,7 +698,7 @@ export default function OfflinePage() {
       });
       return;
     }
-    
+
     // Save last used players
     localStorage.setItem("lastUsedPlayers", JSON.stringify(filteredNames));
 
@@ -763,74 +762,74 @@ export default function OfflinePage() {
       .sort((a, b) => a.localeCompare(b));
 
     if (currentPlayers.length === 0) {
-        toast({ title: "No players to save", variant: "destructive" });
-        return;
+      toast({ title: "No players to save", variant: "destructive" });
+      return;
     }
 
     try {
-        const existing = JSON.parse(localStorage.getItem("playerGroups") || "{}");
-        existing[formattedGroupName.trim()] = currentPlayers;
-        localStorage.setItem("playerGroups", JSON.stringify(existing));
-        toast({ title: "Group saved!", description: `Saved "${formattedGroupName}" with ${currentPlayers.length} players.` });
-        setShowSaveGroupDialog(false);
+      const existing = JSON.parse(localStorage.getItem("playerGroups") || "{}");
+      existing[formattedGroupName.trim()] = currentPlayers;
+      localStorage.setItem("playerGroups", JSON.stringify(existing));
+      toast({ title: "Group saved!", description: `Saved "${formattedGroupName}" with ${currentPlayers.length} players.` });
+      setShowSaveGroupDialog(false);
     } catch (e) {
-        console.error(e);
-        toast({ title: "Error saving group", variant: "destructive" });
+      console.error(e);
+      toast({ title: "Error saving group", variant: "destructive" });
     }
   };
 
   const handleOpenLoadGroup = () => {
     try {
-        const groups = JSON.parse(localStorage.getItem("playerGroups") || "{}");
-        setSavedGroups(groups);
-        setExpandedGroup(null);
-        
-        // Sync current players to selection
-        const currentValidPlayers = players
-            .filter(p => typeof p === 'string' && p.trim() !== "")
-            .map(p => ({
-                id: generateId(), 
-                name: p
-            }));
-            
-        console.log(`[Sync] Synchronizing ${currentValidPlayers.length} players from input to load dialog.`);
-        
-        // Validation logging
-        const allGroupPlayers = new Set(Object.values(groups).flat());
-        const missingPlayers = currentValidPlayers.filter(p => !allGroupPlayers.has(p.name));
-        
-        if (missingPlayers.length > 0) {
-            console.warn(`[Sync Warning] The following input players are not found in any saved group: ${missingPlayers.map(p => p.name).join(", ")}`);
-        } else {
-            console.log(`[Sync Success] All input players match existing saved group entries.`);
-        }
+      const groups = JSON.parse(localStorage.getItem("playerGroups") || "{}");
+      setSavedGroups(groups);
+      setExpandedGroup(null);
 
-        setSelectedGroupPlayers(currentValidPlayers);
-        setShowLoadGroupDialog(true);
+      // Sync current players to selection
+      const currentValidPlayers = players
+        .filter(p => typeof p === 'string' && p.trim() !== "")
+        .map(p => ({
+          id: generateId(),
+          name: p
+        }));
+
+      console.log(`[Sync] Synchronizing ${currentValidPlayers.length} players from input to load dialog.`);
+
+      // Validation logging
+      const allGroupPlayers = new Set(Object.values(groups).flat());
+      const missingPlayers = currentValidPlayers.filter(p => !allGroupPlayers.has(p.name));
+
+      if (missingPlayers.length > 0) {
+        console.warn(`[Sync Warning] The following input players are not found in any saved group: ${missingPlayers.map(p => p.name).join(", ")}`);
+      } else {
+        console.log(`[Sync Success] All input players match existing saved group entries.`);
+      }
+
+      setSelectedGroupPlayers(currentValidPlayers);
+      setShowLoadGroupDialog(true);
     } catch (e) {
-        console.error(e);
-        toast({ title: "Error loading groups", variant: "destructive" });
+      console.error(e);
+      toast({ title: "Error loading groups", variant: "destructive" });
     }
   };
 
   const handleDeleteGroup = (groupName, e) => {
-      e.stopPropagation();
-      const newGroups = { ...savedGroups };
-      delete newGroups[groupName];
-      setSavedGroups(newGroups);
-      localStorage.setItem("playerGroups", JSON.stringify(newGroups));
-      if (expandedGroup === groupName) {
-          setExpandedGroup(null);
-          setSelectedGroupPlayers([]);
-      }
+    e.stopPropagation();
+    const newGroups = { ...savedGroups };
+    delete newGroups[groupName];
+    setSavedGroups(newGroups);
+    localStorage.setItem("playerGroups", JSON.stringify(newGroups));
+    if (expandedGroup === groupName) {
+      setExpandedGroup(null);
+      setSelectedGroupPlayers([]);
+    }
   };
 
   const handleToggleGroup = (groupName) => {
-      if (expandedGroup === groupName) {
-          setExpandedGroup(null);
-      } else {
-          setExpandedGroup(groupName);
-      }
+    if (expandedGroup === groupName) {
+      setExpandedGroup(null);
+    } else {
+      setExpandedGroup(groupName);
+    }
   };
 
   const handleMovePlayerToSelected = (playerName, groupName) => {
@@ -840,10 +839,10 @@ export default function OfflinePage() {
     // Get the source element position
     const sourceKey = `${groupName}-${playerName}`;
     const sourceEl = playerRefs.current[sourceKey];
-    
+
     if (sourceEl) {
       const sourceRect = sourceEl.getBoundingClientRect();
-      
+
       // Set initial state - measuring phase
       setAnimatingPlayers(prev => ({
         ...prev,
@@ -867,138 +866,138 @@ export default function OfflinePage() {
   };
 
   const handleRemoveFromSelected = (playerId) => {
-      // Find the player name
-      const playerToRemove = selectedGroupPlayers.find(p => p.id === playerId);
-      if (!playerToRemove) return;
-      
-      const playerName = playerToRemove.name;
+    // Find the player name
+    const playerToRemove = selectedGroupPlayers.find(p => p.id === playerId);
+    if (!playerToRemove) return;
 
-      // Find which group this player belongs to (to know where to animate back to)
-      // We prioritize the currently expanded group if they are in it
-      let targetGroupName = null;
-      
-      if (expandedGroup && savedGroups[expandedGroup]?.includes(playerName)) {
-        targetGroupName = expandedGroup;
-      } else {
-        // Search all groups
-        for (const [groupName, players] of Object.entries(savedGroups)) {
-          if (players.includes(playerName)) {
-            targetGroupName = groupName;
-            break;
+    const playerName = playerToRemove.name;
+
+    // Find which group this player belongs to (to know where to animate back to)
+    // We prioritize the currently expanded group if they are in it
+    let targetGroupName = null;
+
+    if (expandedGroup && savedGroups[expandedGroup]?.includes(playerName)) {
+      targetGroupName = expandedGroup;
+    } else {
+      // Search all groups
+      for (const [groupName, players] of Object.entries(savedGroups)) {
+        if (players.includes(playerName)) {
+          targetGroupName = groupName;
+          break;
+        }
+      }
+    }
+
+    // If we found a group, set up the animation
+    if (targetGroupName) {
+      // Find the source element (the row in the selected list)
+      const sourceEl = document.querySelector(`[data-player-name="${playerName}"]`);
+
+      if (sourceEl) {
+        const sourceRect = sourceEl.getBoundingClientRect();
+
+        setAnimatingPlayers(prev => ({
+          ...prev,
+          [playerName]: {
+            sourceRect: {
+              top: sourceRect.top,
+              left: sourceRect.left,
+              width: sourceRect.width,
+              height: sourceRect.height
+            },
+            targetRect: null,
+            status: 'measuring',
+            direction: 'removing', // New field to indicate direction
+            groupName: targetGroupName
           }
-        }
+        }));
       }
+    }
 
-      // If we found a group, set up the animation
-      if (targetGroupName) {
-        // Find the source element (the row in the selected list)
-        const sourceEl = document.querySelector(`[data-player-name="${playerName}"]`);
-        
-        if (sourceEl) {
-          const sourceRect = sourceEl.getBoundingClientRect();
-          
-          setAnimatingPlayers(prev => ({
-            ...prev,
-            [playerName]: {
-              sourceRect: {
-                top: sourceRect.top,
-                left: sourceRect.left,
-                width: sourceRect.width,
-                height: sourceRect.height
-              },
-              targetRect: null,
-              status: 'measuring',
-              direction: 'removing', // New field to indicate direction
-              groupName: targetGroupName
-            }
-          }));
-        }
-      }
-
-      setSelectedGroupPlayers(prev => prev.filter(p => p.id !== playerId));
+    setSelectedGroupPlayers(prev => prev.filter(p => p.id !== playerId));
   };
 
   const handleDragEndDialog = (event) => {
-      const { active, over } = event;
-      if (active.id !== over.id) {
-          setSelectedGroupPlayers((items) => {
-              const oldIndex = items.findIndex(p => p.id === active.id);
-              let newIndex = items.findIndex(p => p.id === over.id);
-              
-              // Restrict to the last item index to prevent overshoot
-              if (newIndex >= items.length) {
-                newIndex = items.length - 1;
-              }
-              
-              return arrayMove(items, oldIndex, newIndex);
-          });
-      }
+    const { active, over } = event;
+    if (active.id !== over.id) {
+      setSelectedGroupPlayers((items) => {
+        const oldIndex = items.findIndex(p => p.id === active.id);
+        let newIndex = items.findIndex(p => p.id === over.id);
+
+        // Restrict to the last item index to prevent overshoot
+        if (newIndex >= items.length) {
+          newIndex = items.length - 1;
+        }
+
+        return arrayMove(items, oldIndex, newIndex);
+      });
+    }
   };
 
   const handleAddSelectedPlayers = () => {
-      // Get existing non-empty players
-      const existingNames = players
-          .map(p => (typeof p === "string" ? p : p.name || ""))
-          .filter(name => name.trim() !== "");
-          
-      // Filter out players that are already in the existing list to avoid duplicates
-      const newNames = selectedGroupPlayers
-          .map(p => p.name)
-          .filter(name => !existingNames.includes(name));
-      
-      if (newNames.length === 0) {
-          toast({ title: "No New Players", description: "All selected players are already in the list." });
-          return;
-      }
+    // Get existing non-empty players
+    const existingNames = players
+      .map(p => (typeof p === "string" ? p : p.name || ""))
+      .filter(name => name.trim() !== "");
 
-      let allNames = [...existingNames, ...newNames];
-      let count = allNames.length;
-      let description = `${newNames.length} new players added.`;
+    // Filter out players that are already in the existing list to avoid duplicates
+    const newNames = selectedGroupPlayers
+      .map(p => p.name)
+      .filter(name => !existingNames.includes(name));
 
-      if (count > 20) {
-          allNames = allNames.slice(0, 20);
-          count = 20;
-          description = `${newNames.length} new players added. List truncated to 20 maximum.`;
-      }
+    if (newNames.length === 0) {
+      toast({ title: "No New Players", description: "All selected players are already in the list." });
+      return;
+    }
 
-      // Enforce minimum 3 players
-      if (count < 3) {
-        const needed = 3 - count;
-        allNames = [...allNames, ...Array(needed).fill("")];
-        count = 3;
-      }
+    let allNames = [...existingNames, ...newNames];
+    let count = allNames.length;
+    let description = `${newNames.length} new players added.`;
 
-      setPlayers(allNames);
-      setPlayerCount(count);
-      setNameErrors(Array(count).fill(""));
-      setPlayerIds(allNames.map(() => generateId()));
-      applyRecommendedRoles(count);
-      setRounds(Math.max(1, count - 2));
-      setShowLoadGroupDialog(false);
-      toast({ title: "Players Added", description });
+    if (count > 20) {
+      allNames = allNames.slice(0, 20);
+      count = 20;
+      description = `${newNames.length} new players added. List truncated to 20 maximum.`;
+    }
+
+    // Enforce minimum 3 players
+    if (count < 3) {
+      const needed = 3 - count;
+      allNames = [...allNames, ...Array(needed).fill("")];
+      count = 3;
+    }
+
+    setPlayers(allNames);
+    setPlayerCount(count);
+    setNameErrors(Array(count).fill(""));
+    setPlayerIds(allNames.map(() => generateId()));
+    applyRecommendedRoles(count);
+    setRounds(Math.max(1, count - 2));
+    setShowLoadGroupDialog(false);
+    toast({ title: "Players Added", description });
   };
 
   const handleUseSelectedPlayers = () => {
-      let names = selectedGroupPlayers.map(p => p.name);
-      let count = names.length;
-      let description = `${count} players loaded.`;
+    let names = selectedGroupPlayers.map(p => p.name);
+    let count = names.length;
+    let description = `${count} players loaded.`;
 
-      // Enforce minimum 3 players
-      if (count < 3) {
-        const needed = 3 - count;
-        names = [...names, ...Array(needed).fill("")];
-        count = 3;
-        description = `${selectedGroupPlayers.length} players loaded. Added empty slots to meet minimum of 3.`;
-      }
+    // Enforce minimum 3 players
+    if (count < 3) {
+      const needed = 3 - count;
+      names = [...names, ...Array(needed).fill("")];
+      count = 3;
+      description = `${selectedGroupPlayers.length} players loaded. Added empty slots to meet minimum of 3.`;
+    }
 
-      setPlayers(names);
-      setPlayerCount(count);
-      setNameErrors(Array(count).fill(""));
-      setPlayerIds(names.map(() => generateId()));
-      applyRecommendedRoles(count);
-      setRounds(Math.max(1, count - 2));
-      setShowLoadGroupDialog(false);
-      toast({ title: "Players Loaded", description });
+    setPlayers(names);
+    setPlayerCount(count);
+    setNameErrors(Array(count).fill(""));
+    setPlayerIds(names.map(() => generateId()));
+    applyRecommendedRoles(count);
+    setRounds(Math.max(1, count - 2));
+    setShowLoadGroupDialog(false);
+    toast({ title: "Players Loaded", description });
   };
 
   // --- Feature 2: Main List Drag Logic ---
@@ -1008,13 +1007,13 @@ export default function OfflinePage() {
     if (active.id !== over.id) {
       const oldIndex = playerIds.indexOf(active.id);
       let newIndex = playerIds.indexOf(over.id);
-      
+
       // Restrict to the last item index to prevent overshoot
       // Ensure we don't drop beyond the current list length
       if (newIndex >= playerIds.length) {
-          newIndex = playerIds.length - 1;
+        newIndex = playerIds.length - 1;
       }
-      
+
       setPlayers((items) => arrayMove(items, oldIndex, newIndex));
       setNameErrors((items) => arrayMove(items, oldIndex, newIndex));
       setPlayerIds((items) => arrayMove(items, oldIndex, newIndex));
@@ -1023,7 +1022,7 @@ export default function OfflinePage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 text-white">
-      <div className="container mx-auto px-4 py-6">
+      <div className="container mx-auto px-4 pt-10 pb-6">
         <div className="flex justify-between items-center mb-6">
           <Link to="/" className="text-blue-400 hover:text-blue-300 inline-flex items-center">
             <ArrowLeft className="mr-2 h-4 w-4" />
@@ -1033,9 +1032,9 @@ export default function OfflinePage() {
             variant="outline"
             size="icon"
             onClick={handlePauseGame}
-            className="h-8 w-8 bg-gray-800/70"
+            className="h-10 w-10 bg-gray-800/70 rounded-full"
           >
-            <Pause className="h-4 w-4 fill-white" />
+            <Pause className="h-5 w-5 fill-white" />
           </Button>
         </div>
 
@@ -1196,7 +1195,7 @@ export default function OfflinePage() {
                 <div className="space-y-2">
                   <Label htmlFor="wordCategory">Word Category</Label>
                   <Select value={wordCategory} onValueChange={setWordCategory}>
-                    <SelectTrigger className="bg-gray-700 border-gray-600">
+                    <SelectTrigger id="wordCategory" className="bg-gray-700 border-gray-600">
                       <SelectValue placeholder="Select category" />
                     </SelectTrigger>
                     <SelectContent className="bg-gray-800 border-gray-700">
@@ -1213,54 +1212,54 @@ export default function OfflinePage() {
                   <div className="flex justify-between items-center">
                     <Label>Players</Label>
                     <div className="flex gap-2">
-                        <Button 
-                            variant="outline" 
-                            size="sm" 
-                            onClick={handleOpenLoadGroup}
-                            className="h-8 text-xs border-gray-600 bg-gray-800 hover:bg-gray-700"
-                        >
-                            <FolderOpen className="w-3 h-3 mr-1" /> Load Group
-                        </Button>
-                        <Button 
-                            variant="outline" 
-                            size="sm" 
-                            onClick={handleOpenSaveGroup}
-                            className="h-8 text-xs border-gray-600 bg-gray-800 hover:bg-gray-700"
-                        >
-                            <Save className="w-3 h-3 mr-1" /> Save Group
-                        </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleOpenLoadGroup}
+                        className="h-8 text-xs border-gray-600 bg-gray-800 hover:bg-gray-700"
+                      >
+                        <FolderOpen className="w-3 h-3 mr-1" /> Load Group
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleOpenSaveGroup}
+                        className="h-8 text-xs border-gray-600 bg-gray-800 hover:bg-gray-700"
+                      >
+                        <Save className="w-3 h-3 mr-1" /> Save Group
+                      </Button>
                     </div>
                   </div>
-                  
+
                   <div className="space-y-3 max-h-60 overflow-y-auto pr-2">
-                    <DndContext 
-                        sensors={sensors}
-                        collisionDetection={closestCenter}
-                        modifiers={[restrictToVerticalAxis, restrictToParentElement]}
-                        onDragEnd={handleDragEndMain}
+                    <DndContext
+                      sensors={sensors}
+                      collisionDetection={closestCenter}
+                      modifiers={[restrictToVerticalAxis, restrictToParentElement]}
+                      onDragEnd={handleDragEndMain}
                     >
-                        <SortableContext 
-                            items={playerIds}
-                            strategy={verticalListSortingStrategy}
-                        >
-                            {playerIds.map((id, index) => (
-                                <SortablePlayerRow
-                                key={id}
-                                id={id}
-                                index={index}
-                                value={players[index]}
-                                error={nameErrors[index]}
-                                onChange={(e) => handlePlayerNameChange(index, e.target.value)}
-                                onBlur={() => handlePlayerNameBlur(index)}
-                                onRemove={() => handleRemovePlayer(index)}
-                                onKeyDown={(e) => handleKeyDown(e, index)}
-                                inputRef={(el) => (inputRefs.current[index] = el)}
-                            />
-                            ))}
-                        </SortableContext>
+                      <SortableContext
+                        items={playerIds}
+                        strategy={verticalListSortingStrategy}
+                      >
+                        {playerIds.map((id, index) => (
+                          <SortablePlayerRow
+                            key={id}
+                            id={id}
+                            index={index}
+                            value={players[index]}
+                            error={nameErrors[index]}
+                            onChange={(e) => handlePlayerNameChange(index, e.target.value)}
+                            onBlur={() => handlePlayerNameBlur(index)}
+                            onRemove={() => handleRemovePlayer(index)}
+                            onKeyDown={(e) => handleKeyDown(e, index)}
+                            inputRef={(el) => (inputRefs.current[index] = el)}
+                          />
+                        ))}
+                      </SortableContext>
                     </DndContext>
                   </div>
-                  
+
                   <Button
                     onClick={handleAddPlayer}
                     variant="outline"
@@ -1293,14 +1292,14 @@ export default function OfflinePage() {
         onAddPlayer={() => {
           setShowPauseMenu(false);
           // Navigate to setup page with current players
-          navigate('/offline', { 
-            state: { 
+          navigate('/offline', {
+            state: {
               players: players.map((name, index) => ({
                 name,
                 id: index + 1
               })),
               fromGame: true
-            } 
+            }
           });
         }}
         title="Game Setup Paused"
@@ -1317,17 +1316,17 @@ export default function OfflinePage() {
           </DialogHeader>
           <div className="py-4">
             <Label htmlFor="groupName" className="mb-2 block">Group Name</Label>
-            <Input 
-                id="groupName"
-                value={groupNameInput}
-                onChange={(e) => {
-                    // Title Case: Capitalize first letter of each word
-                    const val = e.target.value.replace(/\b\w/g, c => c.toUpperCase());
-                    setGroupNameInput(val);
-                }}
-                placeholder="e.g. Friday Squad"
-                className="bg-gray-700 border-gray-600"
-                autoFocus
+            <Input
+              id="groupName"
+              value={groupNameInput}
+              onChange={(e) => {
+                // Title Case: Capitalize first letter of each word
+                const val = e.target.value.replace(/\b\w/g, c => c.toUpperCase());
+                setGroupNameInput(val);
+              }}
+              placeholder="e.g. Friday Squad"
+              className="bg-gray-700 border-gray-600"
+              autoFocus
             />
           </div>
           <DialogFooter>
@@ -1346,141 +1345,141 @@ export default function OfflinePage() {
               Select a group and choose players to load.
             </DialogDescription>
           </DialogHeader>
-          
+
           <div role="status" aria-live="polite" className="sr-only">
             {announcement}
           </div>
-          
+
           <ScrollArea className="flex-1 mt-4 border border-gray-700 rounded-md bg-gray-900/20">
             <div className="p-4 pt-0 space-y-8">
               {/* Section 1: Selected Players */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between border-b border-gray-700 pb-2 sticky top-0 bg-gray-900/95 backdrop-blur-sm z-10 -mx-4 px-4 pt-2">
-                    <h3 className="font-semibold text-sm text-gray-200">Selected Players</h3>
-                    <span className="text-xs text-gray-400 bg-gray-800 px-2 py-0.5 rounded-full border border-gray-700">
-                        {selectedGroupPlayers.length}
-                    </span>
+                  <h3 className="font-semibold text-sm text-gray-200">Selected Players</h3>
+                  <span className="text-xs text-gray-400 bg-gray-800 px-2 py-0.5 rounded-full border border-gray-700">
+                    {selectedGroupPlayers.length}
+                  </span>
                 </div>
 
                 <div className="min-h-[100px]" ref={selectedListRef}>
-                    {selectedGroupPlayers.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-8 text-gray-500 border-2 border-dashed border-gray-800 rounded-lg bg-gray-900/30">
-                            <User className="h-8 w-8 mb-2 opacity-50" />
-                            <p className="text-sm italic">No players selected</p>
-                            <p className="text-xs text-gray-600 mt-1">Tap players from groups below to add them</p>
-                        </div>
-                    ) : (
-                        <DndContext 
-                                sensors={sensors}
-                                collisionDetection={closestCenter}
-                                modifiers={[restrictToVerticalAxis, restrictToParentElement]}
-                                onDragEnd={handleDragEndDialog}
-                            >
-                            <SortableContext 
-                                items={selectedGroupPlayers.map(p => p.id)}
-                                strategy={verticalListSortingStrategy}
-                            >
-                                {selectedGroupPlayers.map((player, index) => (
-                                    <SortableDialogRow 
-                                        key={player.id} 
-                                        id={player.id} 
-                                        name={player.name} 
-                                        index={index} 
-                                        onRemove={() => handleRemoveFromSelected(player.id)}
-                                        style={animatingPlayers[player.name] ? { opacity: 0 } : {}}
-                                    />
-                                ))}
-                            </SortableContext>
-                        </DndContext>
-                    )}
+                  {selectedGroupPlayers.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-8 text-gray-500 border-2 border-dashed border-gray-800 rounded-lg bg-gray-900/30">
+                      <User className="h-8 w-8 mb-2 opacity-50" />
+                      <p className="text-sm italic">No players selected</p>
+                      <p className="text-xs text-gray-600 mt-1">Tap players from groups below to add them</p>
+                    </div>
+                  ) : (
+                    <DndContext
+                      sensors={sensors}
+                      collisionDetection={closestCenter}
+                      modifiers={[restrictToVerticalAxis, restrictToParentElement]}
+                      onDragEnd={handleDragEndDialog}
+                    >
+                      <SortableContext
+                        items={selectedGroupPlayers.map(p => p.id)}
+                        strategy={verticalListSortingStrategy}
+                      >
+                        {selectedGroupPlayers.map((player, index) => (
+                          <SortableDialogRow
+                            key={player.id}
+                            id={player.id}
+                            name={player.name}
+                            index={index}
+                            onRemove={() => handleRemoveFromSelected(player.id)}
+                            style={animatingPlayers[player.name] ? { opacity: 0 } : {}}
+                          />
+                        ))}
+                      </SortableContext>
+                    </DndContext>
+                  )}
                 </div>
               </div>
 
               {/* Section 2: Saved Groups */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between border-b border-gray-700 pb-2 sticky top-0 bg-gray-900/95 backdrop-blur-sm z-10 -mx-4 px-4 pt-2">
-                    <h3 className="font-semibold text-sm text-gray-200">Saved Groups</h3>
-                    <span className="text-xs text-gray-400 bg-gray-800 px-2 py-0.5 rounded-full border border-gray-700">
-                        {Object.keys(savedGroups).length}
-                    </span>
+                  <h3 className="font-semibold text-sm text-gray-200">Saved Groups</h3>
+                  <span className="text-xs text-gray-400 bg-gray-800 px-2 py-0.5 rounded-full border border-gray-700">
+                    {Object.keys(savedGroups).length}
+                  </span>
                 </div>
 
                 <div>
-                    {Object.keys(savedGroups).length === 0 ? (
-                        <div className="text-center py-8 text-gray-500">
-                            <p className="text-sm italic">No saved groups found</p>
-                        </div>
-                    ) : (
-                        <div className="space-y-3">
-                            {Object.entries(savedGroups).map(([groupName, groupPlayers]) => (
-                                <div key={groupName} className="border border-gray-700 rounded-lg overflow-hidden bg-gray-800/20">
-                                    <div 
-                                        className="flex items-center justify-between p-3 cursor-pointer hover:bg-gray-800/50 transition-colors"
-                                        onClick={() => handleToggleGroup(groupName)}
-                                        data-group-header={groupName}
-                                    >
-                                        <div className="flex items-center gap-3 overflow-hidden">
-                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold text-white shadow-sm ${getAvatarColor(groupName)}`}>
-                                                {groupName.charAt(0).toUpperCase()}
-                                            </div>
-                                            <span className="font-medium text-base truncate text-gray-200">{groupName}</span>
+                  {Object.keys(savedGroups).length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">
+                      <p className="text-sm italic">No saved groups found</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {Object.entries(savedGroups).map(([groupName, groupPlayers]) => (
+                        <div key={groupName} className="border border-gray-700 rounded-lg overflow-hidden bg-gray-800/20">
+                          <div
+                            className="flex items-center justify-between p-3 cursor-pointer hover:bg-gray-800/50 transition-colors"
+                            onClick={() => handleToggleGroup(groupName)}
+                            data-group-header={groupName}
+                          >
+                            <div className="flex items-center gap-3 overflow-hidden">
+                              <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold text-white shadow-sm ${getAvatarColor(groupName)}`}>
+                                {groupName.charAt(0).toUpperCase()}
+                              </div>
+                              <span className="font-medium text-base truncate text-gray-200">{groupName}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-gray-400 bg-gray-800 px-2 py-0.5 rounded-full">
+                                {groupPlayers.length} players
+                              </span>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-gray-500 hover:text-red-400 hover:bg-red-900/20"
+                                onClick={(e) => handleDeleteGroup(groupName, e)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+                          {expandedGroup === groupName && (
+                            <div className="p-3 space-y-2 bg-gray-900/30 border-t border-gray-700 animate-in slide-in-from-top-2 duration-200">
+                              <AnimatePresence>
+                                {groupPlayers
+                                  .filter(playerName => !selectedGroupPlayers.some(p => p.name === playerName))
+                                  .map((playerName) => {
+                                    return (
+                                      <motion.div
+                                        layout
+                                        initial={{ opacity: 0, height: 0 }}
+                                        animate={{ opacity: 1, height: 'auto' }}
+                                        exit={{ opacity: 0, height: 0, marginBottom: 0, padding: 0, border: 0, overflow: 'hidden' }}
+                                        transition={{ duration: 0.3 }}
+                                        key={playerName}
+                                        ref={el => playerRefs.current[`${groupName}-${playerName}`] = el}
+                                        data-player-name={playerName}
+                                        className="group flex items-center justify-between p-3 rounded-md cursor-pointer bg-gray-800/40 border border-gray-700/50 hover:bg-gray-700/60 hover:border-gray-500 mb-2"
+                                        onClick={() => handleMovePlayerToSelected(playerName, groupName)}
+                                      >
+                                        <div className="flex items-center gap-3">
+                                          <div className="bg-gray-700/50 w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium text-gray-400">
+                                            {getInitials(playerName)}
+                                          </div>
+                                          <span className="text-sm font-medium text-gray-300 group-hover:text-white">{playerName}</span>
                                         </div>
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-xs text-gray-400 bg-gray-800 px-2 py-0.5 rounded-full">
-                                                {groupPlayers.length} players
-                                            </span>
-                                            <Button 
-                                                variant="ghost" 
-                                                size="icon" 
-                                                className="h-8 w-8 text-gray-500 hover:text-red-400 hover:bg-red-900/20"
-                                                onClick={(e) => handleDeleteGroup(groupName, e)}
-                                            >
-                                                <Trash2 className="h-4 w-4" />
-                                            </Button>
-                                        </div>
-                                    </div>
-                                    {expandedGroup === groupName && (
-                                        <div className="p-3 space-y-2 bg-gray-900/30 border-t border-gray-700 animate-in slide-in-from-top-2 duration-200">
-                                    <AnimatePresence>
-                                            {groupPlayers
-                                                .filter(playerName => !selectedGroupPlayers.some(p => p.name === playerName))
-                                                .map((playerName) => {
-                                                return (
-                                                    <motion.div 
-                                                        layout
-                                                        initial={{ opacity: 0, height: 0 }}
-                                                        animate={{ opacity: 1, height: 'auto' }}
-                                                        exit={{ opacity: 0, height: 0, marginBottom: 0, padding: 0, border: 0, overflow: 'hidden' }}
-                                                        transition={{ duration: 0.3 }}
-                                                        key={playerName} 
-                                                        ref={el => playerRefs.current[`${groupName}-${playerName}`] = el}
-                                                        data-player-name={playerName}
-                                                        className="group flex items-center justify-between p-3 rounded-md cursor-pointer bg-gray-800/40 border border-gray-700/50 hover:bg-gray-700/60 hover:border-gray-500 mb-2"
-                                                        onClick={() => handleMovePlayerToSelected(playerName, groupName)}
-                                                    >
-                                                        <div className="flex items-center gap-3">
-                                                            <div className="bg-gray-700/50 w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium text-gray-400">
-                                                                {getInitials(playerName)}
-                                                            </div>
-                                                            <span className="text-sm font-medium text-gray-300 group-hover:text-white">{playerName}</span>
-                                                        </div>
-                                                        <Plus className="h-5 w-5 text-purple-400 opacity-0 group-hover:opacity-100 transition-all duration-200 transform group-hover:scale-110" />
-                                                    </motion.div>
-                                                );
-                                            })}
-                                            </AnimatePresence>
-                                            {groupPlayers.every(p => selectedGroupPlayers.some(sp => sp.name === p)) && (
-                                                <div className="flex items-center justify-center py-3 text-gray-500 gap-2">
-                                                    <div className="w-1.5 h-1.5 rounded-full bg-green-500/50"></div>
-                                                    <p className="text-xs italic">All players added</p>
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
+                                        <Plus className="h-5 w-5 text-purple-400 opacity-0 group-hover:opacity-100 transition-all duration-200 transform group-hover:scale-110" />
+                                      </motion.div>
+                                    );
+                                  })}
+                              </AnimatePresence>
+                              {groupPlayers.every(p => selectedGroupPlayers.some(sp => sp.name === p)) && (
+                                <div className="flex items-center justify-center py-3 text-gray-500 gap-2">
+                                  <div className="w-1.5 h-1.5 rounded-full bg-green-500/50"></div>
+                                  <p className="text-xs italic">All players added</p>
                                 </div>
-                            ))}
+                              )}
+                            </div>
+                          )}
                         </div>
-                    )}
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -1489,20 +1488,20 @@ export default function OfflinePage() {
           <DialogFooter className="gap-2 sm:gap-3 flex-col sm:flex-row">
             <Button variant="outline" onClick={() => setShowLoadGroupDialog(false)} className="border-gray-600 hover:bg-gray-700 sm:mr-auto w-full sm:w-auto">Cancel</Button>
             <div className="flex gap-2 w-full sm:w-auto">
-                <Button 
-                    onClick={handleAddSelectedPlayers} 
-                    className="bg-blue-600 hover:bg-blue-700 flex-1 sm:flex-none"
-                    disabled={selectedGroupPlayers.length === 0}
-                >
-                    Add to List
-                </Button>
-                <Button 
-                    onClick={handleUseSelectedPlayers} 
-                    className="bg-purple-600 hover:bg-purple-700 flex-1 sm:flex-none"
-                    disabled={selectedGroupPlayers.length === 0}
-                >
-                    Replace List
-                </Button>
+              <Button
+                onClick={handleAddSelectedPlayers}
+                className="bg-blue-600 hover:bg-blue-700 flex-1 sm:flex-none"
+                disabled={selectedGroupPlayers.length === 0}
+              >
+                Add to List
+              </Button>
+              <Button
+                onClick={handleUseSelectedPlayers}
+                className="bg-purple-600 hover:bg-purple-700 flex-1 sm:flex-none"
+                disabled={selectedGroupPlayers.length === 0}
+              >
+                Replace List
+              </Button>
             </div>
           </DialogFooter>
 
@@ -1510,7 +1509,7 @@ export default function OfflinePage() {
           <AnimatePresence>
             {Object.entries(animatingPlayers).map(([name, data]) => {
               if (data.status !== 'animating' || !data.targetRect) return null;
-              
+
               const isRemoving = data.direction === 'removing';
 
               // Colors for interpolation
@@ -1556,50 +1555,50 @@ export default function OfflinePage() {
                   }}
                   className="fixed pointer-events-none z-[9999] rounded-md border shadow-xl overflow-hidden"
                 >
-                    {/* Layer 1: Source Layout (Group Item Style) */}
-                    <motion.div
-                        className="absolute inset-0 flex items-center justify-between p-3"
-                        initial={{ opacity: isRemoving ? 0 : 1 }}
-                        animate={{ opacity: isRemoving ? 1 : 0 }}
-                        transition={{ 
-                            duration: 0.2,
-                            delay: isRemoving ? 0.25 : 0 
-                        }}
-                    >
-                        <div className="flex items-center gap-3">
-                            <div className="bg-gray-700/50 w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-medium text-gray-400">
-                                {getInitials(name)}
-                            </div>
-                            <span className="text-sm font-medium text-gray-300 whitespace-nowrap">{name}</span>
-                        </div>
-                        <Plus className="h-5 w-5 text-purple-400" />
-                    </motion.div>
+                  {/* Layer 1: Source Layout (Group Item Style) */}
+                  <motion.div
+                    className="absolute inset-0 flex items-center justify-between p-3"
+                    initial={{ opacity: isRemoving ? 0 : 1 }}
+                    animate={{ opacity: isRemoving ? 1 : 0 }}
+                    transition={{
+                      duration: 0.2,
+                      delay: isRemoving ? 0.25 : 0
+                    }}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="bg-gray-700/50 w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-medium text-gray-400">
+                        {getInitials(name)}
+                      </div>
+                      <span className="text-sm font-medium text-gray-300 whitespace-nowrap">{name}</span>
+                    </div>
+                    <Plus className="h-5 w-5 text-purple-400" />
+                  </motion.div>
 
-                    {/* Layer 2: Destination Layout (List Item Style) */}
-                    <motion.div
-                        className="absolute inset-0 flex items-center gap-3 p-3"
-                        initial={{ opacity: isRemoving ? 1 : 0 }}
-                        animate={{ opacity: isRemoving ? 0 : 1 }}
-                        transition={{ 
-                            duration: 0.2,
-                            delay: isRemoving ? 0 : 0.25 
-                        }}
+                  {/* Layer 2: Destination Layout (List Item Style) */}
+                  <motion.div
+                    className="absolute inset-0 flex items-center gap-3 p-3"
+                    initial={{ opacity: isRemoving ? 1 : 0 }}
+                    animate={{ opacity: isRemoving ? 0 : 1 }}
+                    transition={{
+                      duration: 0.2,
+                      delay: isRemoving ? 0 : 0.25
+                    }}
+                  >
+                    <div className="text-gray-500 flex-shrink-0 p-1">
+                      <GripVertical size={20} />
+                    </div>
+                    <div className="bg-gray-700/50 w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-medium text-gray-400">
+                      {(data.targetIndex !== undefined ? data.targetIndex : 0) + 1}
+                    </div>
+                    <span className="flex-1 truncate text-base font-medium text-gray-200">{name}</span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-gray-400 opacity-0"
                     >
-                        <div className="text-gray-500 flex-shrink-0 p-1">
-                            <GripVertical size={20} />
-                        </div>
-                        <div className="bg-gray-700/50 w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-medium text-gray-400">
-                            {(data.targetIndex !== undefined ? data.targetIndex : 0) + 1}
-                        </div>
-                        <span className="flex-1 truncate text-base font-medium text-gray-200">{name}</span>
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-gray-400 opacity-0"
-                        >
-                            <Minus className="h-4 w-4" />
-                        </Button>
-                    </motion.div>
+                      <Minus className="h-4 w-4" />
+                    </Button>
+                  </motion.div>
                 </motion.div>
               );
             })}

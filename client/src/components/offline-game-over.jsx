@@ -53,11 +53,11 @@ export default function OfflineGameOver({
   const eliminatedMrWhite = players.filter(p => p.isEliminated && p.role === "Mr. White");
 
   let winnerRole = "Civilians";
-  
+
   // If Mr. White guessed correctly, they win
   if (whiteGuessCorrect) {
     winnerRole = "Mr. White";
-  } 
+  }
   // If undercover agents remain and no civilians, undercover wins
   else if (remainingCivilians.length === 0 && (remainingUndercover.length > 0 || remainingMrWhite.length > 0)) {
     winnerRole = "Undercover";
@@ -82,17 +82,17 @@ export default function OfflineGameOver({
 
   const getTopScorer = () => {
     if (!scores) return null;
-    
+
     let topPlayer = null;
     let topScore = -1;
-    
+
     Object.entries(scores).forEach(([playerId, score]) => {
       if (score > topScore) {
         topScore = score;
         topPlayer = players.find(p => p.id === parseInt(playerId));
       }
     });
-    
+
     return {
       player: topPlayer,
       score: topScore
@@ -107,11 +107,11 @@ export default function OfflineGameOver({
 
   const confirmAddPlayer = () => {
     setShowAddPlayerDialog(false);
-    navigate('/offline', { 
-      state: { 
+    navigate('/offline', {
+      state: {
         players: players,
         fromGame: true
-      } 
+      }
     });
   };
 
@@ -141,17 +141,17 @@ export default function OfflineGameOver({
   // Animation variants
   const containerVariants = {
     hidden: { opacity: 0, y: 20 },
-    visible: { 
-      opacity: 1, 
+    visible: {
+      opacity: 1,
       y: 0,
-      transition: { 
-        duration: 0.5, 
+      transition: {
+        duration: 0.5,
         ease: [0.4, 0, 0.2, 1],
         staggerChildren: 0.1
       }
     },
-    exit: { 
-      opacity: 0, 
+    exit: {
+      opacity: 0,
       y: -20,
       transition: { duration: 0.3, ease: [0.4, 0, 0.2, 1] }
     }
@@ -159,177 +159,174 @@ export default function OfflineGameOver({
 
   const itemVariants = {
     hidden: { opacity: 0, y: 10 },
-    visible: { 
-      opacity: 1, 
+    visible: {
+      opacity: 1,
       y: 0,
       transition: { duration: 0.3, ease: [0.4, 0, 0.2, 1] }
     }
   };
 
   return (
-    <motion.div 
-      className="w-full"
+    <motion.div
+      className="min-h-[100dvh] w-full flex flex-col"
       variants={containerVariants}
       initial="hidden"
       animate="visible"
       exit="exit"
     >
-      <div className="max-w-4xl mx-auto mb-4 flex justify-end">
+      <div className="relative w-full flex-1 flex flex-col">
         <Button
           variant="outline"
           size="icon"
+          className="absolute top-4 right-4 sm:top-6 sm:right-6 h-10 w-10 sm:h-12 sm:w-12 bg-gray-800 rounded-full border border-gray-600 shadow-xl z-50 hover:bg-gray-700"
           onClick={() => setShowPauseMenu(true)}
-          className="h-8 w-8"
         >
-          <Pause className="h-4 w-4" />
+          <Pause className="h-5 w-5 sm:h-6 sm:w-6" />
         </Button>
-      </div>
-
-      <Card className="max-w-4xl mx-auto glass-effect shadow-soft overflow-hidden">
-        <CardHeader className="text-center pb-2">
-          <motion.div variants={itemVariants} className="flex justify-center mb-4">
-            {winnerRole === "Civilians" && (
-              <div className="h-16 w-16 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                <Users className="h-8 w-8 text-blue-600 dark:text-blue-400" />
-              </div>
-            )}
-            {winnerRole === "Undercover" && (
-              <div className="h-16 w-16 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
-                <User className="h-8 w-8 text-red-600 dark:text-red-400" />
-              </div>
-            )}
-            {winnerRole === "Mr. White" && (
-              <div className="h-16 w-16 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
-                <User className="h-8 w-8 text-purple-600 dark:text-purple-400" />
-              </div>
-            )}
-          </motion.div>
-          <motion.div variants={itemVariants}>
-            <CardTitle className="text-3xl font-bold mb-2">
-              Game Over
-            </CardTitle>
-            <p className="text-xl text-muted-foreground">
-              {winnerRole === "Civilians" && "The Civilians have won!"}
-              {winnerRole === "Undercover" && "The Undercover Agents have won!"}
-              {winnerRole === "Mr. White" && (
-                whiteGuessCorrect 
-                  ? "Mr. White guessed the word correctly and won!" 
-                  : "Mr. White is the last player standing and won!"
+        <Card className="w-full flex-1 flex flex-col glass-effect shadow-none overflow-x-hidden border-0 rounded-none bg-[#0a0f1c]/90">
+          <CardHeader className="text-center pb-2 relative pt-8 sm:pt-12">
+            <motion.div variants={itemVariants} className="flex justify-center mb-4">
+              {winnerRole === "Civilians" && (
+                <div className="h-16 w-16 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                  <Users className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+                </div>
               )}
-            </p>
-          </motion.div>
-        </CardHeader>
-        
-        <CardContent className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <motion.div variants={itemVariants} className="space-y-4">
-              <h3 className="text-lg font-semibold flex items-center gap-2">
-                <Trophy className="h-5 w-5 text-primary" />
-                <span>Top Scorer</span>
-              </h3>
-              {topScorer && topScorer.player && (
-                <div className="flex items-center gap-3 p-4 rounded-lg bg-background/50 border will-change-transform">
-                  <Avatar className="h-12 w-12 border-2 border-background">
-                    <AvatarImage src={topScorer.player.avatar} alt={topScorer.player.name} />
-                    <AvatarFallback className="bg-primary/10 text-primary">
-                      {topScorer.player.name.charAt(0).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <p className="font-medium">{topScorer.player.name}</p>
-                    <p className="text-sm text-muted-foreground">Score: {topScorer.score}</p>
+              {winnerRole === "Undercover" && (
+                <div className="h-16 w-16 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                  <User className="h-8 w-8 text-red-600 dark:text-red-400" />
+                </div>
+              )}
+              {winnerRole === "Mr. White" && (
+                <div className="h-16 w-16 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
+                  <User className="h-8 w-8 text-purple-600 dark:text-purple-400" />
+                </div>
+              )}
+            </motion.div>
+            <motion.div variants={itemVariants}>
+              <CardTitle className="text-3xl font-bold mb-2">
+                Game Over
+              </CardTitle>
+              <p className="text-xl text-muted-foreground">
+                {winnerRole === "Civilians" && "The Civilians have won!"}
+                {winnerRole === "Undercover" && "The Undercover Agents have won!"}
+                {winnerRole === "Mr. White" && (
+                  whiteGuessCorrect
+                    ? "Mr. White guessed the word correctly and won!"
+                    : "Mr. White is the last player standing and won!"
+                )}
+              </p>
+            </motion.div>
+          </CardHeader>
+
+          <CardContent className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <motion.div variants={itemVariants} className="space-y-4">
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+                  <Trophy className="h-5 w-5 text-primary" />
+                  <span>Top Scorer</span>
+                </h3>
+                {topScorer && topScorer.player && (
+                  <div className="flex items-center gap-3 p-4 rounded-lg bg-background/50 border will-change-transform">
+                    <Avatar className="h-12 w-12 border-2 border-background">
+                      <AvatarImage src={topScorer.player.avatar} alt={topScorer.player.name} />
+                      <AvatarFallback className="bg-primary/10 text-primary">
+                        {topScorer.player.name.charAt(0).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="font-medium">{topScorer.player.name}</p>
+                      <p className="text-sm text-muted-foreground">Score: {topScorer.score}</p>
+                    </div>
+                  </div>
+                )}
+              </motion.div>
+
+              <motion.div variants={itemVariants} className="space-y-4">
+                <h3 className="text-lg font-semibold">The Words</h3>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="p-4 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-900/30 will-change-transform">
+                    <p className="text-sm text-blue-600 dark:text-blue-400 font-medium mb-1">Civilian Word</p>
+                    <p className="text-lg font-bold text-blue-700 dark:text-blue-300">{civilianWord}</p>
+                  </div>
+                  <div className="p-4 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 will-change-transform">
+                    <p className="text-sm text-red-600 dark:text-red-400 font-medium mb-1">Undercover Word</p>
+                    <p className="text-lg font-bold text-red-700 dark:text-red-300">{undercoverWord}</p>
                   </div>
                 </div>
-              )}
-            </motion.div>
-            
-            <motion.div variants={itemVariants} className="space-y-4">
-              <h3 className="text-lg font-semibold">The Words</h3>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="p-4 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-900/30 will-change-transform">
-                  <p className="text-sm text-blue-600 dark:text-blue-400 font-medium mb-1">Civilian Word</p>
-                  <p className="text-lg font-bold text-blue-700 dark:text-blue-300">{civilianWord}</p>
-                </div>
-                <div className="p-4 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 will-change-transform">
-                  <p className="text-sm text-red-600 dark:text-red-400 font-medium mb-1">Undercover Word</p>
-                  <p className="text-lg font-bold text-red-700 dark:text-red-300">{undercoverWord}</p>
-                </div>
+              </motion.div>
+            </div>
+
+            <motion.div variants={itemVariants}>
+              <h3 className="text-lg font-semibold mb-3">Player Results</h3>
+              <div className="overflow-hidden rounded-lg border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Player</TableHead>
+                      <TableHead className="text-center">Role</TableHead>
+                      <TableHead className="text-center">Score</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {players.map((player, index) => (
+                      <motion.tr
+                        key={player.id}
+                        className={`border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted ${player.isEliminated ? "opacity-60" : ""}`}
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.3 + (index * 0.05), duration: 0.3 }}
+                      >
+                        <TableCell className="font-medium">
+                          <div className="flex items-center gap-2">
+                            <Avatar className="h-8 w-8">
+                              <AvatarImage src={player.avatar} alt={player.name} />
+                              <AvatarFallback className="bg-primary/10 text-primary text-xs">
+                                {player.name.charAt(0).toUpperCase()}
+                              </AvatarFallback>
+                            </Avatar>
+                            <span>{player.name}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant="outline" className={cn(getRoleBadgeColor(player.role))}>
+                            {player.role}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-center">{scores?.[player.id] || 0}</TableCell>
+                      </motion.tr>
+                    ))}
+                  </TableBody>
+                </Table>
               </div>
             </motion.div>
-          </div>
-          
-          <motion.div variants={itemVariants}>
-            <h3 className="text-lg font-semibold mb-3">Player Results</h3>
-            <div className="overflow-hidden rounded-lg border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Player</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead>Word</TableHead>
-                    <TableHead className="text-right">Score</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {players.map((player, index) => (
-                    <motion.tr 
-                      key={player.id} 
-                      className={`border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted ${player.isEliminated ? "opacity-60" : ""}`}
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: 0.3 + (index * 0.05), duration: 0.3 }}
-                    >
-                      <TableCell className="font-medium">
-                        <div className="flex items-center gap-2">
-                          <Avatar className="h-8 w-8">
-                            <AvatarImage src={player.avatar} alt={player.name} />
-                            <AvatarFallback className="bg-primary/10 text-primary text-xs">
-                              {player.name.charAt(0).toUpperCase()}
-                            </AvatarFallback>
-                          </Avatar>
-                          <span>{player.name}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className={cn(getRoleBadgeColor(player.role))}>
-                          {player.role}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{player.word || (player.role === "Mr. White" ? "Unknown" : "")}</TableCell>
-                      <TableCell className="text-right">{scores?.[player.id] || 0}</TableCell>
-                    </motion.tr>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </motion.div>
-        </CardContent>
-        
-        <CardFooter className="flex flex-wrap gap-3 justify-center pt-2 pb-6">
-          <motion.div variants={itemVariants} className="flex flex-wrap gap-3 justify-center w-full">
-            <Button onClick={onRestart} className="flex items-center gap-2 !bg-blue-600 hover:!bg-blue-700 transition-all hover:scale-105 active:scale-95">
-              <RotateCcw className="h-4 w-4" />
-              Play Again
-            </Button>
-            <Button 
-              variant="outline" 
-              onClick={handleAddPlayers} 
-              className="flex items-center gap-2 !bg-blue-600 hover:!bg-blue-700 text-white transition-all hover:scale-105 active:scale-95"
-            >
-              <UserPlus className="h-4 w-4" />
-              Add Player
-            </Button>
-            <Button 
-              variant="ghost" 
-              onClick={handleQuit} 
-              className="flex items-center gap-2 !bg-red-600 hover:!bg-red-700 text-white transition-all hover:scale-105 active:scale-95"
-            >
-              <Home className="h-4 w-4" />
-              Return Home
-            </Button>
-          </motion.div>
-        </CardFooter>
-      </Card>
+          </CardContent>
+
+          <CardFooter className="flex flex-wrap gap-3 justify-center pt-2 pb-6">
+            <motion.div variants={itemVariants} className="flex flex-wrap gap-3 justify-center w-full">
+              <Button onClick={onRestart} className="flex items-center gap-2 !bg-blue-600 hover:!bg-blue-700 transition-all hover:scale-105 active:scale-95">
+                <RotateCcw className="h-4 w-4" />
+                Play Again
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleAddPlayers}
+                className="flex items-center gap-2 !bg-blue-600 hover:!bg-blue-700 text-white transition-all hover:scale-105 active:scale-95"
+              >
+                <UserPlus className="h-4 w-4" />
+                Add Player
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={handleQuit}
+                className="flex items-center gap-2 !bg-red-600 hover:!bg-red-700 text-white transition-all hover:scale-105 active:scale-95"
+              >
+                <Home className="h-4 w-4" />
+                Return Home
+              </Button>
+            </motion.div>
+          </CardFooter>
+        </Card>
+      </div>
 
       <PauseMenu
         isOpen={showPauseMenu}
@@ -342,6 +339,7 @@ export default function OfflineGameOver({
         }}
         title="Game Over Menu"
       />
+
 
       <Dialog open={showAddPlayerDialog} onOpenChange={setShowAddPlayerDialog}>
         <DialogContent className="bg-gray-800 text-white">

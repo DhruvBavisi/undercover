@@ -51,36 +51,36 @@ const router = createBrowserRouter([
       </AppProviders>
     ),
     children: [
-      { 
-        index: true, 
-        element: <HomePage /> 
+      {
+        index: true,
+        element: <HomePage />
       },
-      { 
-        path: 'create', 
+      {
+        path: 'create',
         element: (
           <GameRoomProvider>
             <CreateGamePage />
           </GameRoomProvider>
         )
       },
-      { 
-        path: 'join', 
+      {
+        path: 'join',
         element: (
           <GameRoomProvider>
             <JoinGamePage />
           </GameRoomProvider>
         )
       },
-      { 
-        path: 'game/:gameCode', 
+      {
+        path: 'game/:gameCode',
         element: (
           <GameRoomProvider>
             <WaitingRoomPage />
           </GameRoomProvider>
         )
       },
-      { 
-        path: 'online-game/:gameCode', 
+      {
+        path: 'online-game/:gameCode',
         element: (
           <GameRoomProvider>
             <OnlineGamePage />

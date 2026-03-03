@@ -26,22 +26,11 @@ export default function OfflineElimination({ player, civilianWord, onWhiteGuess,
   const [guessCorrect, setGuessCorrect] = useState(false)
 
   const getPlayerTheme = (name) => {
-    const themes = [
-      { gradient: "var(--gradient-primary)", glow: "#3b82f6" },   // Blue/Indigo
-      { gradient: "var(--gradient-secondary)", glow: "#10b981" }, // Emerald/Blue
-      { gradient: "var(--gradient-accent)", glow: "#f59e0b" },    // Amber/Red
-      { gradient: "var(--gradient-cool)", glow: "#0ea5e9" },      // Sky/Purple
-      { gradient: "var(--gradient-warm)", glow: "#f97316" },      // Orange/Pink
-    ];
-    
-    if (!name) return themes[0];
-    let hash = 0;
-    for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
-    return themes[Math.abs(hash) % themes.length];
+    return { gradient: "linear-gradient(135deg, #4b5563, #374151)", glow: "#6b7280" }; // Gray-600 to Gray-700
   };
 
   const theme = getPlayerTheme(player.name);
-  
+
   const getInitials = (name) => {
     if (!name) return '?';
     return name
@@ -80,18 +69,7 @@ export default function OfflineElimination({ player, civilianWord, onWhiteGuess,
     }
   }
 
-  const roleTheme = (() => {
-    switch (player.role) {
-      case "Civilian":
-        return { gradient: "linear-gradient(135deg, #10b981 0%, #059669 100%)", glow: "#10b981" }; // Green
-      case "Undercover":
-        return { gradient: "linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)", glow: "#ef4444" }; // Red
-      case "Mr. White":
-        return { gradient: "linear-gradient(135deg, #6b7280 0%, #374151 100%)", glow: "#9ca3af" }; // Gray
-      default:
-        return theme;
-    }
-  })();
+  const roleTheme = { gradient: "linear-gradient(135deg, #4b5563, #374151)", glow: "#6b7280" }; // Universally gray for eliminated status
 
   const roleImage = (() => {
     switch (player.role) {
@@ -117,16 +95,16 @@ export default function OfflineElimination({ player, civilianWord, onWhiteGuess,
           style={{ transformStyle: "preserve-3d" }}
         >
           {/* FRONT FACE - Elimination Confirmation */}
-          <Card 
+          <Card
             className="absolute inset-0 bg-gray-800/70 border-gray-700 shadow-sm overflow-hidden backface-hidden"
             style={{ backfaceVisibility: "hidden" }}
           >
             <CardHeader className="text-center border-b border-gray-700 relative z-10">
               {onUndo && (
-                <Button 
-                  variant="ghost" 
+                <Button
+                  variant="ghost"
                   size="icon"
-                  onClick={onUndo} 
+                  onClick={onUndo}
                   className="absolute left-4 top-1/2 -translate-y-1/2 bg-gray-500/10 hover:bg-gray-700/50 text-gray-400 hover:text-white rounded-full h-8 w-8 z-50"
                   type="button"
                 >
@@ -138,22 +116,22 @@ export default function OfflineElimination({ player, civilianWord, onWhiteGuess,
             <CardContent className="text-center space-y-6 py-6 pt-6 min-h-[300px] flex flex-col justify-center">
               <div className="py-8 w-full">
                 {/* Avatar Section */}
-                <motion.div 
+                <motion.div
                   className="relative flex items-center justify-center mb-6"
                   initial={{ scale: 0.8, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
                   transition={{ type: "spring", stiffness: 220, damping: 18, delay: 0.1 }}
                 >
                   {/* Pulsing glow */}
-                  <motion.div 
+                  <motion.div
                     className="absolute w-[140px] h-[140px] rounded-full -z-10"
                     style={{ background: `radial-gradient(circle, ${theme.glow}33 0%, transparent 70%)` }}
                     animate={{ scale: [1, 1.12, 1] }}
                     transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
                   />
-                  
+
                   {/* Avatar Circle */}
-                  <div 
+                  <div
                     className="w-24 h-24 rounded-full flex items-center justify-center shadow-2xl border-4 border-white/10"
                     style={{ background: theme.gradient }}
                   >
@@ -167,10 +145,9 @@ export default function OfflineElimination({ player, civilianWord, onWhiteGuess,
                   This player has been eliminated. Tap the button below to reveal their role.
                 </p>
 
-                <Button 
-                  onClick={handleRevealRole} 
-                  className="w-full shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
-                  style={{ background: "var(--gradient-primary)" }}
+                <Button
+                  onClick={handleRevealRole}
+                  className="w-full shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98] bg-blue-600 hover:bg-blue-700 text-white border-0 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Reveal Role
                 </Button>
@@ -179,7 +156,7 @@ export default function OfflineElimination({ player, civilianWord, onWhiteGuess,
           </Card>
 
           {/* BACK FACE - Role Revealed */}
-          <Card 
+          <Card
             className="bg-gray-800/70 border-gray-700 shadow-sm overflow-hidden backface-hidden"
             style={{ backfaceVisibility: "hidden", transform: "rotateY(180deg)" }}
           >
@@ -189,29 +166,29 @@ export default function OfflineElimination({ player, civilianWord, onWhiteGuess,
             <CardContent className="text-center space-y-6 py-6 pb-2 pt-6 min-h-[300px] flex flex-col justify-center">
               <div className="w-full">
                 {/* Avatar Section */}
-                <motion.div 
+                <motion.div
                   className="relative flex items-center justify-center mb-6 mt-4"
                   initial={{ scale: 0.8, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
                   transition={{ type: "spring", stiffness: 220, damping: 18, delay: 0.1 }}
                 >
                   {/* Pulsing glow */}
-                  <motion.div 
+                  <motion.div
                     className="absolute w-[140px] h-[140px] rounded-full -z-10"
                     style={{ background: `radial-gradient(circle, ${roleTheme.glow}33 0%, transparent 70%)` }}
                     animate={{ scale: [1, 1.12, 1] }}
                     transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
                   />
-                  
+
                   {/* Avatar Circle */}
-                  <div 
+                  <div
                     className="w-24 h-24 rounded-full flex items-center justify-center shadow-2xl border-4 border-white/10 overflow-hidden"
                     style={{ background: roleTheme.gradient }}
                   >
                     {roleImage ? (
-                       <img src={roleImage} alt={player.role} className="w-full h-full object-cover" />
+                      <img src={roleImage} alt={player.role} className="w-full h-full object-cover scale-125 transform" />
                     ) : (
-                       <span className="text-4xl font-bold text-white">{initial}</span>
+                      <span className="text-4xl font-bold text-white">{initial}</span>
                     )}
                   </div>
                 </motion.div>
@@ -230,7 +207,7 @@ export default function OfflineElimination({ player, civilianWord, onWhiteGuess,
 
                 {player.role === "Mr. White" ? (
                   !guessSubmitted ? (
-                    <motion.div 
+                    <motion.div
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: 0.2 }}
@@ -251,15 +228,14 @@ export default function OfflineElimination({ player, civilianWord, onWhiteGuess,
                       </div>
                     </motion.div>
                   ) : (
-                    <motion.div 
+                    <motion.div
                       initial={{ opacity: 0, scale: 0.9 }}
                       animate={{ opacity: 1, scale: 1 }}
                       className="mb-6 space-y-4"
                     >
                       <div
-                        className={`p-4 rounded-lg border ${
-                          guessCorrect ? "bg-green-500/20 border-green-500/30" : "bg-red-500/20 border-red-500/30"
-                        }`}
+                        className={`p-4 rounded-lg border ${guessCorrect ? "bg-green-500/20 border-green-500/30" : "bg-red-500/20 border-red-500/30"
+                          }`}
                       >
                         <div className="flex items-center justify-center mb-2">
                           {guessCorrect ? (
@@ -284,7 +260,7 @@ export default function OfflineElimination({ player, civilianWord, onWhiteGuess,
             </CardContent>
             <CardFooter>
               {(player.role !== "Mr. White" || guessSubmitted) && (
-                <Button onClick={onComplete} className="w-full">
+                <Button onClick={onComplete} className="w-full bg-blue-600 hover:bg-blue-700 text-white">
                   Continue
                 </Button>
               )}

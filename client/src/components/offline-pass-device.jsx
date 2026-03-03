@@ -13,18 +13,8 @@ export default function OfflinePassDevice({ playerName, playerAvatar, showAvatar
   const [isFlipping, setIsFlipping] = useState(false);
 
   const getPlayerTheme = (name) => {
-    const themes = [
-      { gradient: "var(--gradient-primary)", glow: "#3b82f6" },   // Blue/Indigo
-      { gradient: "var(--gradient-secondary)", glow: "#10b981" }, // Emerald/Blue
-      { gradient: "var(--gradient-accent)", glow: "#f59e0b" },    // Amber/Red
-      { gradient: "var(--gradient-cool)", glow: "#0ea5e9" },      // Sky/Purple
-      { gradient: "var(--gradient-warm)", glow: "#f97316" },      // Orange/Pink
-    ];
-    
-    if (!name) return themes[0];
-    let hash = 0;
-    for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
-    return themes[Math.abs(hash) % themes.length];
+    // Return a uniform grey theme for all players as requested
+    return { gradient: "linear-gradient(135deg, #4b5563, #374151)", glow: "#6b7280" }; // Gray-600 to Gray-700
   };
 
   const theme = getPlayerTheme(playerName);
@@ -40,7 +30,7 @@ export default function OfflinePassDevice({ playerName, playerAvatar, showAvatar
 
   return (
     <div className="flex items-center justify-center min-h-screen px-4" style={{ perspective: "1000px" }}>
-      <motion.div 
+      <motion.div
         className="w-full max-w-lg flex flex-col items-center gap-8 relative p-8 rounded-lg border text-card-foreground shadow-sm bg-gray-800/70 border-gray-700 overflow-hidden min-h-[550px] justify-center"
         initial={{ rotateY: 0 }}
         animate={{ rotateY: isFlipping ? 90 : 0 }}
@@ -48,7 +38,7 @@ export default function OfflinePassDevice({ playerName, playerAvatar, showAvatar
         style={{ transformStyle: "preserve-3d", backfaceVisibility: "hidden" }}
       >
         {/* Label */}
-        <motion.div 
+        <motion.div
           className="text-2xl font-semibold leading-none tracking-tight text-white"
           initial={{ opacity: 0, y: -12 }}
           animate={{ opacity: 1, y: 0 }}
@@ -59,27 +49,27 @@ export default function OfflinePassDevice({ playerName, playerAvatar, showAvatar
 
 
         {/* Avatar Section */}
-        <motion.div 
+        <motion.div
           className="relative flex items-center justify-center"
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={{ type: "spring", stiffness: 220, damping: 18, delay: 0.1 }}
         >
           {/* Pulsing glow */}
-          <motion.div 
+          <motion.div
             className="absolute w-[180px] h-[180px] rounded-full -z-10"
             style={{ background: `radial-gradient(circle, ${theme.glow}33 0%, transparent 70%)` }}
             animate={{ scale: [1, 1.12, 1] }}
             transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
           />
-          
+
           {/* Avatar Circle */}
-          <div 
+          <div
             className="w-32 h-32 rounded-full flex items-center justify-center shadow-2xl border-4 border-white/10"
             style={{ background: theme.gradient }}
           >
             {showAvatar && playerAvatar ? (
-              <img src={playerAvatar} alt={playerName} className="w-full h-full object-cover rounded-full" />
+              <img src={playerAvatar} alt={playerName} className="w-full h-full object-cover scale-125 transform rounded-full" />
             ) : (
               <span className="text-4xl font-bold text-white">{initial}</span>
             )}
@@ -87,7 +77,7 @@ export default function OfflinePassDevice({ playerName, playerAvatar, showAvatar
         </motion.div>
 
         {/* Player Name Block */}
-        <motion.div 
+        <motion.div
           className="text-center"
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
@@ -98,7 +88,7 @@ export default function OfflinePassDevice({ playerName, playerAvatar, showAvatar
         </motion.div>
 
         {/* Divider */}
-        <motion.div 
+        <motion.div
           className="w-full h-px bg-gray-700/50"
           initial={{ scaleX: 0 }}
           animate={{ scaleX: 1 }}
@@ -106,15 +96,14 @@ export default function OfflinePassDevice({ playerName, playerAvatar, showAvatar
         />
 
         {/* Reveal Word Button */}
-        <motion.div 
+        <motion.div
           className="w-full"
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.35 }}
         >
-          <Button 
-            className="w-full py-6 transition-all hover:scale-[1.02] active:scale-[0.97]"
-            style={{ background: theme.gradient }}
+          <Button
+            className="w-full py-6 transition-all hover:scale-[1.02] active:scale-[0.97] bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-900/40 border-0"
             onClick={handleReveal}
           >
             Reveal Word
@@ -122,7 +111,7 @@ export default function OfflinePassDevice({ playerName, playerAvatar, showAvatar
         </motion.div>
 
         {/* Bottom Hint */}
-        <motion.p 
+        <motion.p
           className="text-gray-300 text-sm text-center"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1, y: 0 }}

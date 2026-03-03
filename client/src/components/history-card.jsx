@@ -1,11 +1,11 @@
 import React, { useState } from "react";
 import { format } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
-import { 
-  Trophy, 
-  Calendar, 
-  Clock, 
-  ChevronDown, 
+import {
+  Trophy,
+  Calendar,
+  Clock,
+  ChevronDown,
   ChevronUp,
   User,
   AlertCircle
@@ -15,12 +15,12 @@ import { Badge } from "./ui/badge";
 
 export const HistoryAvatar = ({ role, isEliminated, className = "" }) => {
   const [imageError, setImageError] = useState(false);
-  
+
   // Map roles to avatar files
   const getAvatarSrc = (role) => {
     if (!role) return '/avatars/civilian.png';
     const normalizedRole = role.toLowerCase().replace('.', '').replace(' ', '');
-    
+
     if (normalizedRole.includes('mrwhite')) return '/avatars/mrwhite.png';
     if (normalizedRole.includes('undercover')) return '/avatars/undercover.png';
     return '/avatars/civilian.png';
@@ -36,10 +36,10 @@ export const HistoryAvatar = ({ role, isEliminated, className = "" }) => {
 
   return (
     <div className={`relative ${className}`}>
-      <img 
-        src={getAvatarSrc(role)} 
+      <img
+        src={getAvatarSrc(role)}
         alt={role}
-        className={`w-full h-full object-cover rounded-full ${isEliminated ? 'grayscale opacity-60' : ''}`}
+        className={`w-full h-full object-cover scale-125 transform rounded-full ${isEliminated ? 'grayscale opacity-60' : ''}`}
         onError={() => setImageError(true)}
       />
       {isEliminated && (
@@ -61,24 +61,23 @@ const HistoryCard = ({ game }) => {
   }
 
   return (
-    <Card 
+    <Card
       className={`bg-gray-800/50 border-gray-700 overflow-hidden transition-all duration-300 hover:bg-gray-800/70 ${isExpanded ? 'ring-1 ring-purple-500/50' : ''}`}
     >
-      <div 
+      <div
         className="p-4 cursor-pointer"
         onClick={() => setIsExpanded(!isExpanded)}
       >
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-4">
-            <div className={`p-3 rounded-full ${
-              game.winner === 'Civilians' ? 'bg-green-500/20 text-green-400' :
-              game.winner === 'Undercover' ? 'bg-red-500/20 text-red-400' :
-              game.winner === 'Mr. White' ? 'bg-blue-500/20 text-blue-400' :
-              'bg-gray-100/20 text-gray-400'
-            }`}>
+            <div className={`p-3 rounded-full ${game.winner === 'Civilians' ? 'bg-green-500/20 text-green-400' :
+                game.winner === 'Undercover' ? 'bg-red-500/20 text-red-400' :
+                  game.winner === 'Mr. White' ? 'bg-blue-500/20 text-blue-400' :
+                    'bg-gray-100/20 text-gray-400'
+              }`}>
               <Trophy className="h-5 w-5" />
             </div>
-            
+
             <div>
               <h3 className="font-bold text-lg text-white">
                 {game.winner} Won
@@ -126,7 +125,7 @@ const HistoryCard = ({ game }) => {
             className="overflow-hidden"
           >
             <div className="p-4 pt-0 border-t border-gray-700/50 space-y-4">
-              
+
               {/* Words Section */}
               <div className="grid grid-cols-2 gap-4 mt-4">
                 <div className="bg-gray-900/40 p-3 rounded-lg border border-gray-700/50">
@@ -154,16 +153,15 @@ const HistoryCard = ({ game }) => {
                 </h4>
                 <div className="space-y-2">
                   {game.players.map((player, idx) => (
-                    <motion.div 
+                    <motion.div
                       key={idx}
                       initial={{ opacity: 0, x: -10 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: idx * 0.05 }}
-                      className={`flex items-center justify-between p-2 rounded-md ${
-                        player.role === 'Civilian' ? 'bg-green-900/10 hover:bg-green-900/20' :
-                        player.role === 'Undercover' ? 'bg-red-900/10 hover:bg-red-900/20' :
-                        'bg-blue-900/10 hover:bg-blue-900/20'
-                      }`}
+                      className={`flex items-center justify-between p-2 rounded-md ${player.role === 'Civilian' ? 'bg-green-900/10 hover:bg-green-900/20' :
+                          player.role === 'Undercover' ? 'bg-red-900/10 hover:bg-red-900/20' :
+                            'bg-blue-900/10 hover:bg-blue-900/20'
+                        }`}
                     >
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-full overflow-hidden bg-gray-700 flex-shrink-0">
@@ -179,11 +177,10 @@ const HistoryCard = ({ game }) => {
                             ELIMINATED
                           </Badge>
                         )}
-                        <Badge variant="outline" className={`text-xs ${
-                          player.role === 'Civilian' ? 'border-green-500/30 text-green-400' :
-                          player.role === 'Undercover' ? 'border-red-500/30 text-red-400' :
-                          'border-blue-500/30 text-blue-400'
-                        }`}>
+                        <Badge variant="outline" className={`text-xs ${player.role === 'Civilian' ? 'border-green-500/30 text-green-400' :
+                            player.role === 'Undercover' ? 'border-red-500/30 text-red-400' :
+                              'border-blue-500/30 text-blue-400'
+                          }`}>
                           {player.role}
                         </Badge>
                       </div>

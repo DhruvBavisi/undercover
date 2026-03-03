@@ -1,0 +1,6 @@
+--- STARTING INTEGRATION TESTS ---
+Γ£à Room Created: 5KKJPY
+
+--- TEST 1: Concurrency & Real-Time Sync (<100ms) ---
+
+Γ¥î TEST FAILED: Payload missing crucial fields (rounds, messages)

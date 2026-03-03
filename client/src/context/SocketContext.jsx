@@ -14,41 +14,41 @@ export const SocketProvider = ({ children }) => {
 
   useEffect(() => {
     const newSocket = initSocket();
-    
+
     const onConnect = () => {
       console.log('Socket connected');
       setIsConnected(true);
-      
+
       // Authenticate socket with user ID if logged in
       if (isAuthenticated && user?.id) {
         console.log('Authenticating socket with user ID:', user.id);
         newSocket.emit('authenticate', { userId: user.id });
       }
     };
-    
+
     const onDisconnect = () => {
       console.log('Socket disconnected');
       setIsConnected(false);
     };
-    
+
     const onError = (error) => {
       console.error('Socket error:', error);
       setIsConnected(false);
     };
-    
+
     newSocket.on('connect', onConnect);
     newSocket.on('disconnect', onDisconnect);
     newSocket.on('connect_error', onError);
-    
+
     setSocket(newSocket);
-    
+
     return () => {
       newSocket.off('connect', onConnect);
       newSocket.off('disconnect', onDisconnect);
       newSocket.off('connect_error', onError);
       newSocket.disconnect();
     };
-  }, [isAuthenticated, user]);
+  }, [isAuthenticated, user?.id]);
 
   // Re-authenticate when user changes
   useEffect(() => {
@@ -56,7 +56,7 @@ export const SocketProvider = ({ children }) => {
       console.log('Re-authenticating socket with user ID:', user.id);
       socket.emit('authenticate', { userId: user.id });
     }
-  }, [socket, isConnected, isAuthenticated, user]);
+  }, [socket, isConnected, isAuthenticated, user?.id]);
 
   return (
     <SocketContext.Provider value={socket}>

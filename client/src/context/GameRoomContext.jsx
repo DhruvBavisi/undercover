@@ -247,7 +247,7 @@ export const GameRoomProvider = ({ children }) => {
     socket.on('vote-submitted', (data) => {
       setVotes(prev => ({
         ...prev,
-        [data.playerId]: data.votedPlayerId
+        [data.voterId]: data.votedForId
       }));
     });
 
@@ -590,7 +590,7 @@ export const GameRoomProvider = ({ children }) => {
 
   // Check if the current user is the host
   const isHost = () => {
-    return room && user && room.hostId === user.id;
+    return room && user && room.hostId?.toString() === user.id?.toString();
   };
 
   // Start the game
@@ -663,11 +663,15 @@ export const GameRoomProvider = ({ children }) => {
 
   const submitVote = useCallback(async (targetId) => {
     if (!socket || !room?.roomCode) return;
+    const me = room?.players?.find(
+      p => (p.userId?.toString() === user?.id?.toString()) || (p.id?.toString() === user?.id?.toString())
+    );
+    if (me?.isEliminated) return;
 
     socket.emit('submit-vote', {
-      roomCode: room.roomCode,
-      userId: user.id,
-      votedPlayerId: targetId
+      gameCode: room.roomCode,
+      voterId: user.id,
+      votedForId: targetId
     });
   }, [socket, room, user]);
 

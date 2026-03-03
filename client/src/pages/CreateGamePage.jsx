@@ -26,12 +26,14 @@ import { useToast } from '../hooks/use-toast';
 import { Alert, AlertDescription } from '../components/ui/alert';
 import { DEFAULT_ROUND_TIME } from '../config';
 
+import Starfield from "../components/Starfield";
+
 export default function CreateGamePage() {
   const navigate = useNavigate();
   const { isAuthenticated, user } = useAuth();
   const { create, room, loading, error } = useGameRoom();
   const { toast } = useToast();
-  
+
   // Game settings
   const [maxPlayers, setMaxPlayers] = useState(3);
   const [roundTime, setRoundTime] = useState(60);
@@ -98,12 +100,12 @@ export default function CreateGamePage() {
       case 12: return { undercover: 3, mrWhite: 2 }; // 7 Civilians
       case 13: return { undercover: 4, mrWhite: 2 }; // 7 Civilians
       case 14: return { undercover: 4, mrWhite: 2 }; // 8 Civilians
-      case 15: return { undercover: 5, mrWhite: 2 }; // 8 Civilians
-      case 16: return { undercover: 5, mrWhite: 2 }; // 9 Civilians
+      case 15: return { undercover: 4, mrWhite: 3 }; // 8 Civilians
+      case 16: return { undercover: 5, mrWhite: 3 }; // 8 Civilians
       case 17: return { undercover: 5, mrWhite: 3 }; // 9 Civilians
-      case 18: return { undercover: 5, mrWhite: 3 }; // 10 Civilians
-      case 19: return { undercover: 6, mrWhite: 3 }; // 11 Civilians
-      case 20: return { undercover: 6, mrWhite: 3 }; // 11 Civilians
+      case 18: return { undercover: 5, mrWhite: 4 }; // 9 Civilians
+      case 19: return { undercover: 6, mrWhite: 4 }; // 9 Civilians
+      case 20: return { undercover: 6, mrWhite: 4 }; // 10 Civilians
       default: return { undercover: 1, mrWhite: 0 };
     }
   };
@@ -128,13 +130,10 @@ export default function CreateGamePage() {
   const minCivilians = getMinCivilians(maxPlayers);
 
   const handlePlayerCountChange = (count) => {
-    if (count < 3) count = 3;
-    if (count > 20) count = 20;
     setMaxPlayers(count);
-    
-    // Apply recommended roles based on new player count
-    applyRecommendedRoles(count);
-    setRounds(count - 2);
+    const recs = getRecommendedRoles(count);
+    setNumUndercovers(recs.undercover);
+    setNumMrWhites(recs.mrWhite);
   };
 
   const handleUndercoverCountChange = (count) => {
@@ -175,7 +174,7 @@ export default function CreateGamePage() {
       numMrWhites,
       rounds
     };
-    
+
     // Call the create function from GameRoomContext
     await create(settings);
   };
@@ -186,15 +185,16 @@ export default function CreateGamePage() {
 
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 text-white flex items-center justify-center">
+      <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 text-white">
-      <div className="container mx-auto px-4 py-12">
+    <div className="min-h-screen relative overflow-hidden bg-transparent text-white">
+      <Starfield />
+      <div className="container mx-auto px-4 py-12 relative z-10">
         <Link to="/" className="text-blue-400 hover:text-blue-300 mb-8 inline-flex items-center">
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back to Home
@@ -217,27 +217,27 @@ export default function CreateGamePage() {
                 </Alert>
               )}
 
-                <div className="space-y-6">
-                  <div className="space-y-2">
+              <div className="space-y-6">
+                <div className="space-y-2">
                   <Label>Your Name</Label>
-                    <Input
+                  <Input
                     value={user?.name || user?.username || ""}
                     disabled
-                      className="bg-gray-700 border-gray-600"
-                    />
-                  </div>
+                    className="bg-gray-700 border-gray-600"
+                  />
+                </div>
 
-                  <div className="space-y-2">
+                <div className="space-y-2">
                   <Label>Number of Players: {maxPlayers}</Label>
-                    <Slider
+                  <Slider
                     value={[maxPlayers]}
                     onValueChange={([value]) => handlePlayerCountChange(value)}
                     max={20}
                     min={3}
-                      step={1}
-                      className="py-4"
-                    />
-                  </div>
+                    step={1}
+                    className="py-4"
+                  />
+                </div>
 
                 <div className="space-y-4">
                   {/* Civilians Display */}
@@ -252,21 +252,21 @@ export default function CreateGamePage() {
                     {/* Undercover Controls */}
                     <div className="flex items-center gap-2">
                       {numUndercovers > 0 ? (
-                  <Button
+                        <Button
                           variant="outline"
                           size="icon"
                           onClick={() => handleUndercoverCountChange(Math.max(0, numUndercovers - 1))}
                           className="h-7 w-7 !rounded-full bg-black text-white hover:bg-black/80"
                         >
                           <Minus className="h-3 w-3" />
-                  </Button>
+                        </Button>
                       ) : (
                         <div className="h-7 w-7 invisible" />
                       )}
 
                       <div className="bg-black px-8 py-[7px] rounded-full text-white font-semibold">
                         {numUndercovers} {numUndercovers === 1 ? 'Undercover' : 'Undercovers'}
-                </div>
+                      </div>
 
                       {numUndercovers + numMrWhites < maxPlayers - minCivilians ? (
                         <Button
@@ -290,9 +290,9 @@ export default function CreateGamePage() {
                     {/* Mr. White Controls */}
                     <div className="flex items-center gap-2">
                       {numMrWhites > 0 ? (
-                      <Button
+                        <Button
                           variant="outline"
-                        size="icon"
+                          size="icon"
                           onClick={() => handleMrWhiteCountChange(numMrWhites - 1)}
                           className="h-6 w-6 !rounded-full bg-white text-black hover:bg-white/80"
                         >
@@ -319,13 +319,13 @@ export default function CreateGamePage() {
                           className="h-6 w-6 !rounded-full bg-white text-black hover:bg-white/80"
                         >
                           <Plus className="h-2.5 w-2.5" />
-                      </Button>
+                        </Button>
                       ) : (
                         <div className="h-6 w-6 invisible" />
                       )}
                     </div>
                   </div>
-                  </div>
+                </div>
 
                 <div className="space-y-3">
                   <Label>Rounds</Label>
@@ -371,7 +371,7 @@ export default function CreateGamePage() {
                 <div className="space-y-2">
                   <Label htmlFor="wordCategory">Word Category</Label>
                   <Select value={wordPack} onValueChange={setWordPack}>
-                    <SelectTrigger className="bg-gray-700 border-gray-600">
+                    <SelectTrigger id="wordCategory" className="bg-gray-700 border-gray-600">
                       <SelectValue placeholder="Select category" />
                     </SelectTrigger>
                     <SelectContent className="bg-gray-800 border-gray-700">
@@ -382,20 +382,20 @@ export default function CreateGamePage() {
                   </Select>
                 </div>
 
-                  <Button
-                    onClick={handleCreateGame}
-                    className="w-full bg-purple-600 hover:bg-purple-700"
-                    disabled={loading}
-                  >
-                    {loading ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                <Button
+                  onClick={handleCreateGame}
+                  className="w-full bg-purple-600 hover:bg-purple-700"
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       Creating Game...
-                      </>
-                    ) : (
+                    </>
+                  ) : (
                     "Create Online Game"
-                    )}
-                  </Button>
+                  )}
+                </Button>
               </div>
             </CardContent>
           </Card>

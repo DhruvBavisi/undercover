@@ -4,31 +4,163 @@ import { useAuth } from '../context/AuthContext';
 import { useGameRoom } from '../context/GameRoomContext';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '../components/ui/card';
-import { Loader2, Copy, ArrowLeft, Users, RefreshCw, Crown } from 'lucide-react';
+import { Loader2, Copy, ArrowLeft, Users, RefreshCw, Crown, AlertTriangle, Home, Menu, Settings, Plus, Minus } from 'lucide-react';
+import { Label } from '../components/ui/label';
+import { Slider } from '../components/ui/slider';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../components/ui/select';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "../components/ui/sheet";
 import { useToast } from '../hooks/use-toast';
 import { Alert, AlertDescription } from '../components/ui/alert';
 import Starfield from "../components/Starfield";
+import { getAvatarById } from '../utils/avatars';
 
 export default function WaitingRoomPage() {
   const { gameCode } = useParams();
   const navigate = useNavigate();
   const { isAuthenticated, user } = useAuth();
-  const { 
-    room, 
-    loading, 
-    error, 
-    fetchRoom, 
-    setReady, 
-    leave, 
-    isHost, 
-    isPlayerReady, 
+  const {
+    room,
+    loading,
+    error,
+    fetchRoom,
+    setReady,
+    leave,
+    isHost,
+    isPlayerReady,
     startGame,
-    areAllPlayersReady 
+    areAllPlayersReady,
+    updateSettings
   } = useGameRoom();
   const { toast } = useToast();
   const [initialFetchDone, setInitialFetchDone] = useState(false);
   const [isRedirecting, setIsRedirecting] = useState(false);
   const redirectTimeoutRef = useRef(null);
+  const updateTimeoutRef = useRef(null);
+
+  // Settings state (synced with room)
+  const [maxPlayers, setMaxPlayers] = useState(3);
+  const [roundTime, setRoundTime] = useState(60);
+  const [wordPack, setWordPack] = useState('standard');
+  const [numUndercovers, setNumUndercovers] = useState(1);
+  const [numMrWhites, setNumMrWhites] = useState(0);
+  const [rounds, setRounds] = useState(1);
+
+  useEffect(() => {
+    if (room?.settings) {
+      setMaxPlayers(room.settings.maxPlayers ?? 3);
+      setRoundTime(room.settings.roundTime ?? 60);
+      setWordPack(room.settings.wordPack ?? 'standard');
+      setNumUndercovers(room.settings.numUndercovers ?? 1);
+      setNumMrWhites(room.settings.numMrWhites ?? 0);
+      setRounds(room.settings.rounds ?? 1);
+    }
+  }, [room?.settings]);
+
+  const getMaxUndercover = (count) => {
+    if (count <= 3) return 1; if (count <= 5) return 2; if (count <= 7) return 3;
+    if (count <= 9) return 4; if (count <= 11) return 5; if (count <= 13) return 6;
+    if (count <= 15) return 7; if (count <= 17) return 8; return 9;
+  };
+
+  const getMaxMrWhite = (count) => {
+    if (count <= 3) return 1; if (count <= 5) return 2; if (count <= 7) return 3;
+    if (count <= 9) return 4; if (count <= 11) return 5; if (count <= 13) return 6;
+    if (count <= 15) return 7; if (count <= 17) return 8; return 9;
+  };
+
+  const getMinCivilians = (count) => Math.ceil(count / 2);
+
+  const getRecommendedRoles = (count) => {
+    switch (count) {
+      case 3: return { undercover: 1, mrWhite: 0 }; case 4: return { undercover: 1, mrWhite: 0 };
+      case 5: return { undercover: 1, mrWhite: 1 }; case 6: return { undercover: 1, mrWhite: 1 };
+      case 7: return { undercover: 2, mrWhite: 1 }; case 8: return { undercover: 2, mrWhite: 1 };
+      case 9: return { undercover: 3, mrWhite: 1 }; case 10: return { undercover: 3, mrWhite: 1 };
+      case 11: return { undercover: 3, mrWhite: 2 }; case 12: return { undercover: 3, mrWhite: 2 };
+      case 13: return { undercover: 4, mrWhite: 2 }; case 14: return { undercover: 4, mrWhite: 2 };
+      case 15: return { undercover: 4, mrWhite: 3 }; case 16: return { undercover: 5, mrWhite: 3 };
+      case 17: return { undercover: 5, mrWhite: 3 }; case 18: return { undercover: 5, mrWhite: 4 };
+      case 19: return { undercover: 6, mrWhite: 4 }; case 20: return { undercover: 6, mrWhite: 4 };
+      default: return { undercover: 1, mrWhite: 0 };
+    }
+  };
+
+  const handleUpdate = (updates) => {
+    if (!isHost()) return;
+
+    // Optimistically update local states for fast UI response
+    if (updates.maxPlayers !== undefined) setMaxPlayers(updates.maxPlayers);
+    if (updates.roundTime !== undefined) setRoundTime(updates.roundTime);
+    if (updates.wordPack !== undefined) setWordPack(updates.wordPack);
+    if (updates.numUndercovers !== undefined) setNumUndercovers(updates.numUndercovers);
+    if (updates.numMrWhites !== undefined) setNumMrWhites(updates.numMrWhites);
+    if (updates.rounds !== undefined) setRounds(updates.rounds);
+
+    if (updateTimeoutRef.current) clearTimeout(updateTimeoutRef.current);
+    updateTimeoutRef.current = setTimeout(() => {
+      const currentSettings = room?.settings || {};
+      updateSettings({ ...currentSettings, ...updates });
+    }, 500);
+  };
+
+  const handlePlayerCountChange = (count) => {
+    if (!isHost()) return;
+    if (count < room.players.length) {
+      toast({
+        title: "Invalid Capacity",
+        description: `Cannot lower capacity below ${room.players.length} players.`,
+        variant: "destructive"
+      });
+      return;
+    }
+    const recs = getRecommendedRoles(count);
+    handleUpdate({
+      maxPlayers: count,
+      numUndercovers: recs.undercover,
+      numMrWhites: recs.mrWhite,
+      rounds: Math.min(count - 2, rounds)
+    });
+  };
+
+  const handleUndercoverCountChange = (count) => {
+    if (!isHost()) return;
+    let newMrWhites = numMrWhites;
+    if (maxPlayers === 3) {
+      if (count < numUndercovers) newMrWhites = 1;
+      else if (count > numUndercovers) newMrWhites = 0;
+    }
+    handleUpdate({ numUndercovers: count, numMrWhites: newMrWhites });
+  };
+
+  const handleMrWhiteCountChange = (count) => {
+    if (!isHost()) return;
+    let newUndercovers = numUndercovers;
+    if (maxPlayers === 3) {
+      if (count < numMrWhites) newUndercovers = 1;
+      else if (count > numMrWhites) newUndercovers = 0;
+    }
+    handleUpdate({ numMrWhites: count, numUndercovers: newUndercovers });
+  };
+
+  const handleRoundsChange = (newRounds) => {
+    if (!isHost()) return;
+    if (newRounds >= 1 && newRounds <= maxPlayers - 2) {
+      handleUpdate({ rounds: newRounds });
+    }
+  };
 
   // Fetch room details when component mounts
   const fetchGameRoom = useCallback(async () => {
@@ -37,18 +169,18 @@ export default function WaitingRoomPage() {
       navigate('/login');
       return;
     }
-    
+
     if (!gameCode) {
       console.error('No game code provided');
       navigate('/');
       return;
     }
-    
+
     console.log(`WaitingRoomPage: Fetching room with code ${gameCode}`);
     await fetchRoom(gameCode);
     setInitialFetchDone(true);
   }, [isAuthenticated, gameCode, navigate, fetchRoom]);
-  
+
   // Initial fetch on mount
   useEffect(() => {
     fetchGameRoom();
@@ -56,31 +188,35 @@ export default function WaitingRoomPage() {
 
   // Redirect to online game page if game is in progress
   useEffect(() => {
-    if (room && !isRedirecting) {
-      console.log('Room status check for redirection:', room.status);
-      
-      if (room.status === 'in-progress') {
+    if (room) {
+      console.log('Room status check for redirection/reset:', room.status);
+
+      if (room.status === 'in-progress' && !isRedirecting) {
         console.log('Game is in progress, redirecting to online game page...');
         setIsRedirecting(true);
-        
+
         // Clear any existing timeout
         if (redirectTimeoutRef.current) {
           clearTimeout(redirectTimeoutRef.current);
         }
-        
+
         // Set a timeout to navigate after a short delay
         redirectTimeoutRef.current = setTimeout(() => {
           navigate(`/online-game/${gameCode}`);
         }, 500);
+      } else if (room.status === 'waiting' && isRedirecting) {
+        // If room returns to waiting (e.g., play again), cleanly un-freeze
+        console.log('Game is waiting, resetting redirecting state...');
+        setIsRedirecting(false);
       }
     }
-    
+
     return () => {
       if (redirectTimeoutRef.current) {
         clearTimeout(redirectTimeoutRef.current);
       }
     };
-  }, [room, navigate, gameCode]);
+  }, [room, navigate, gameCode, isRedirecting]);
 
   // Copy game code to clipboard
   const copyGameCode = () => {
@@ -106,12 +242,12 @@ export default function WaitingRoomPage() {
   // Handle start game (host only)
   const handleStartGame = () => {
     console.log('Start game button clicked');
-    
+
     if (isRedirecting) {
       console.log('Already processing start game request');
       return;
     }
-    
+
     if (!isHost()) {
       toast({
         title: "Cannot Start Game",
@@ -120,7 +256,7 @@ export default function WaitingRoomPage() {
       });
       return;
     }
-    
+
     if (!areAllPlayersReady()) {
       toast({
         title: "Cannot Start Game",
@@ -129,7 +265,7 @@ export default function WaitingRoomPage() {
       });
       return;
     }
-    
+
     if (room.players.length < 3) {
       toast({
         title: "Cannot Start Game",
@@ -138,11 +274,11 @@ export default function WaitingRoomPage() {
       });
       return;
     }
-    
+
     setIsRedirecting(true);
     console.log('All checks passed, starting game...');
     startGame();
-    
+
     toast({
       title: "Starting Game",
       description: "The game is starting. Please wait...",
@@ -164,13 +300,31 @@ export default function WaitingRoomPage() {
   // Show error state
   if (error && initialFetchDone) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 text-white p-4">
-        <div className="container mx-auto max-w-md text-center">
-          <h1 className="text-2xl font-bold mb-4">Error</h1>
-          <p className="text-red-400 mb-6">{error}</p>
-          <Button onClick={() => navigate('/')} className="bg-blue-600 hover:bg-blue-700">
-            Back to Home
-          </Button>
+      <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 text-white relative overflow-hidden flex items-center justify-center">
+        <Starfield />
+        <div className="relative z-10 container mx-auto px-4 max-w-lg text-center">
+          <div className="bg-gray-900/50 backdrop-blur-md border border-gray-700 p-8 rounded-2xl shadow-2xl">
+            <div className="w-20 h-20 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
+              <AlertTriangle className="h-10 w-10 text-red-500" />
+            </div>
+            <h1 className="text-4xl font-bold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-red-400 to-orange-400">
+              Oops!
+            </h1>
+            <p className="text-xl text-gray-300 mb-6">
+              Connection Error
+            </p>
+            <div className="bg-black/30 p-4 rounded-lg mb-8 text-left overflow-auto max-h-40">
+              <p className="font-mono text-sm text-red-400 text-center">
+                {error}
+              </p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Button onClick={() => navigate('/')} className="w-full sm:w-auto gap-2" size="lg">
+                <Home className="h-4 w-4" />
+                Go Home
+              </Button>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -179,13 +333,31 @@ export default function WaitingRoomPage() {
   // Show not found state
   if (!room && initialFetchDone) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 text-white flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold mb-4">Game Not Found</h1>
-          <p className="text-gray-400 mb-6">The game you're looking for doesn't exist or has ended.</p>
-          <Button onClick={() => navigate('/')} className="bg-blue-600 hover:bg-blue-700">
-            Back to Home
-          </Button>
+      <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 text-white relative overflow-hidden flex items-center justify-center">
+        <Starfield />
+        <div className="relative z-10 container mx-auto px-4 max-w-lg text-center">
+          <div className="bg-gray-900/50 backdrop-blur-md border border-gray-700 p-8 rounded-2xl shadow-2xl">
+            <div className="w-20 h-20 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
+              <AlertTriangle className="h-10 w-10 text-red-500" />
+            </div>
+            <h1 className="text-4xl font-bold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-red-400 to-orange-400">
+              Oops!
+            </h1>
+            <p className="text-xl text-gray-300 mb-6">
+              Room Not Found
+            </p>
+            <div className="bg-black/30 p-4 rounded-lg mb-8 text-left overflow-auto max-h-40">
+              <p className="font-mono text-sm text-red-400 text-center">
+                The game room you are looking for does not exist or has been closed.
+              </p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Button onClick={() => navigate('/')} className="w-full sm:w-auto gap-2" size="lg">
+                <Home className="h-4 w-4" />
+                Go Home
+              </Button>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -197,18 +369,191 @@ export default function WaitingRoomPage() {
       <div className="container mx-auto max-w-2xl p-4 relative z-10">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
-          <Button 
-            variant="ghost" 
-            className="text-gray-400 hover:text-white"
-            onClick={handleLeaveGame}
-          >
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Leave Game
-          </Button>
-          
+          <div className="flex items-center">
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" className="text-gray-400 hover:text-white mr-2">
+                  <Menu className="h-6 w-6" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="w-[300px] sm:w-[400px] bg-gray-900 border-gray-800 text-white overflow-y-auto pt-10">
+                <SheetHeader className="mb-6">
+                  <SheetTitle className="text-2xl text-white flex flex-col gap-2">
+                    <span className="flex items-center gap-2"><Settings className="w-5 h-5" /> Room Menu</span>
+                  </SheetTitle>
+                  <SheetDescription className="text-gray-400 mt-2">
+                    {isHost() ? "Adjust game settings or leave the room." : "View game settings or leave the room."}
+                  </SheetDescription>
+                </SheetHeader>
+
+                <div className="space-y-6">
+                  <div className="space-y-2">
+                    <Label className="text-gray-200">Number of Players: {maxPlayers}</Label>
+                    <Slider
+                      value={[maxPlayers]}
+                      onValueChange={([value]) => handlePlayerCountChange(value)}
+                      max={20}
+                      min={3}
+                      step={1}
+                      className="py-4 cursor-pointer"
+                      disabled={!isHost()}
+                    />
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="bg-blue-500 px-8 py-1.5 rounded-full text-white !w-fit mx-auto shadow-md">
+                      <span className="text-base font-semibold">
+                        {(maxPlayers || 3) - (numUndercovers || 0) - (numMrWhites || 0)} Civilians
+                      </span>
+                    </div>
+
+                    <div className="flex flex-col items-center gap-4">
+                      {/* Undercover Controls */}
+                      <div className="flex items-center gap-2">
+                        {numUndercovers > 0 ? (
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={() => handleUndercoverCountChange(Math.max(0, numUndercovers - 1))}
+                            className="h-7 w-7 !rounded-full bg-black text-white hover:bg-black/80 border-gray-700"
+                            disabled={!isHost()}
+                          >
+                            <Minus className="h-3 w-3" />
+                          </Button>
+                        ) : <div className="h-7 w-7 invisible" />}
+
+                        <div className="bg-black px-8 py-[7px] rounded-full text-white font-semibold shadow-md">
+                          {numUndercovers} {numUndercovers === 1 ? 'Undercover' : 'Undercovers'}
+                        </div>
+
+                        {numUndercovers + numMrWhites < maxPlayers - getMinCivilians(maxPlayers) ? (
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={() => {
+                              const newCount = numUndercovers + 1;
+                              if (newCount <= getMaxUndercover(maxPlayers)) {
+                                handleUndercoverCountChange(newCount);
+                              }
+                            }}
+                            className="h-7 w-7 !rounded-full bg-black text-white hover:bg-black/80 border-gray-700"
+                            disabled={!isHost()}
+                          >
+                            <Plus className="h-3 w-3" />
+                          </Button>
+                        ) : <div className="h-7 w-7 invisible" />}
+                      </div>
+
+                      {/* Mr. White Controls */}
+                      <div className="flex items-center gap-2">
+                        {numMrWhites > 0 ? (
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={() => handleMrWhiteCountChange(numMrWhites - 1)}
+                            className="h-6 w-6 !rounded-full bg-white text-black hover:bg-gray-200"
+                            disabled={!isHost()}
+                          >
+                            <Minus className="h-2.5 w-2.5" />
+                          </Button>
+                        ) : <div className="h-6 w-6 invisible" />}
+
+                        <div className="bg-white px-8 py-1.5 rounded-full text-black font-semibold shadow-md">
+                          {numMrWhites} Mr. White
+                        </div>
+
+                        {numMrWhites + numUndercovers < maxPlayers - getMinCivilians(maxPlayers) ? (
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={() => {
+                              const newCount = numMrWhites + 1;
+                              if (newCount <= getMaxMrWhite(maxPlayers)) {
+                                handleMrWhiteCountChange(newCount);
+                              }
+                            }}
+                            className="h-6 w-6 !rounded-full bg-white text-black hover:bg-gray-200"
+                            disabled={!isHost()}
+                          >
+                            <Plus className="h-2.5 w-2.5" />
+                          </Button>
+                        ) : <div className="h-6 w-6 invisible" />}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <Label className="text-gray-200">Rounds</Label>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="secondary"
+                        size="icon"
+                        onClick={() => handleRoundsChange(rounds - 1)}
+                        disabled={!isHost() || rounds <= 1}
+                        className="bg-purple-700 border-purple-600 text-white hover:bg-purple-600"
+                      >
+                        <Minus className="h-4 w-4" />
+                      </Button>
+                      <div className="w-16 h-10 flex items-center justify-center bg-gray-800 border border-gray-700 rounded-md font-medium text-white shadow-inner">
+                        {rounds}
+                      </div>
+                      <Button
+                        variant="secondary"
+                        size="icon"
+                        onClick={() => handleRoundsChange(rounds + 1)}
+                        disabled={!isHost() || rounds >= maxPlayers - 2}
+                        className="bg-purple-700 border-purple-600 text-white hover:bg-purple-600"
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-gray-200">Round Time: {roundTime} seconds</Label>
+                    <Slider
+                      value={[roundTime]}
+                      onValueChange={([value]) => handleUpdate({ roundTime: value })}
+                      min={30}
+                      max={180}
+                      step={10}
+                      className="py-4 cursor-pointer"
+                      disabled={!isHost()}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="wordCategory" className="text-gray-200">Word Category</Label>
+                    <Select value={wordPack} onValueChange={(val) => handleUpdate({ wordPack: val })} disabled={!isHost()}>
+                      <SelectTrigger id="wordCategory" className="bg-gray-800 border-gray-700 text-white">
+                        <SelectValue placeholder="Select category" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-gray-800 border-gray-700 text-white">
+                        <SelectItem value="standard" className="focus:bg-gray-700 focus:text-white cursor-pointer">Standard</SelectItem>
+                        <SelectItem value="food" className="focus:bg-gray-700 focus:text-white cursor-pointer">Food</SelectItem>
+                        <SelectItem value="places" className="focus:bg-gray-700 focus:text-white cursor-pointer">Places</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="mt-8 pt-6 border-t border-gray-800">
+                  <Button
+                    variant="ghost"
+                    className="w-full text-red-400 hover:text-red-300 hover:bg-red-900/20 justify-start"
+                    onClick={handleLeaveGame}
+                  >
+                    <ArrowLeft className="mr-2 h-4 w-4" />
+                    Leave Game
+                  </Button>
+                </div>
+              </SheetContent>
+            </Sheet>
+          </div>
+
           <div className="flex items-center space-x-2">
             <span className="text-lg font-semibold text-gray-300">Room Code:</span>
-            <div className="flex items-center bg-gray-700 rounded-lg px-3 py-1">
+            <div className="flex items-center bg-gray-800/80 rounded-lg px-3 py-1 shadow-inner border border-gray-700/50">
               <span className="text-lg font-mono mr-2">{gameCode}</span>
               <button
                 onClick={copyGameCode}
@@ -252,18 +597,22 @@ export default function WaitingRoomPage() {
             {/* Players List */}
             <div className="space-y-3">
               {room?.players.map(player => (
-                <div 
+                <div
                   key={player.userId}
                   className="flex items-center justify-between bg-gray-700/30 rounded-lg p-4"
                 >
                   <div className="flex items-center">
-                    <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center mr-3">
-                      <span className="text-white font-bold">
-                        {player.username[0].toUpperCase()}
-                      </span>
+                    <div className={`w-10 h-10 rounded-xl mr-3 flex-shrink-0 ${getAvatarById(player.avatarId || 1).bgColor}`}>
+                      <div className={`w-full h-full flex items-center justify-center rounded-xl overflow-hidden`}>
+                        <img
+                          src={`/avatars/characters/character${player.avatarId || '1'}.png`}
+                          alt={player.name}
+                          className="w-full h-full object-cover scale-125 transform"
+                        />
+                      </div>
                     </div>
                     <div>
-                      <p className="font-medium text-white">{player.username}</p>
+                      <p className="font-medium text-white">{player.name}</p>
                     </div>
                   </div>
                   <div className="flex items-center space-x-2">
@@ -287,11 +636,10 @@ export default function WaitingRoomPage() {
               {!isHost() ? (
                 <Button
                   onClick={handleReadyToggle}
-                  className={`w-full py-4 text-lg font-medium ${
-                    isPlayerReady()
-                      ? '!bg-red-600 hover:!bg-red-700'
-                      : '!bg-green-600 hover:!bg-green-700'
-                  }`}
+                  className={`w-full py-4 text-lg font-medium ${isPlayerReady()
+                    ? '!bg-red-600 hover:!bg-red-700'
+                    : '!bg-green-600 hover:!bg-green-700'
+                    }`}
                   disabled={loading}
                 >
                   {loading ? (

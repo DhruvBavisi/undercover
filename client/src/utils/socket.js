@@ -7,13 +7,15 @@ export const initSocket = () => {
   if (socket) return socket;
 
   console.log('Initializing socket connection to:', SOCKET_URL);
-  
+
   socket = io(SOCKET_URL, {
     transports: ['websocket', 'polling'],
     autoConnect: true,
     reconnection: true,
-    reconnectionAttempts: 5,
+    reconnectionAttempts: Infinity,
     reconnectionDelay: 1000,
+    reconnectionDelayMax: 5000,
+    randomizationFactor: 0.5,
     timeout: 10000,
     withCredentials: true
   });

@@ -12,10 +12,10 @@ const router = express.Router();
 router.post('/create', async (req, res) => {
   try {
     const { playerName, playerCount, roundTime, includeWhite, wordCategory } = req.body;
-    
+
     // Generate a random game code
     const gameCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-    
+
     // Create a new game
     const game = new Game({
       gameCode,
@@ -25,7 +25,7 @@ router.post('/create', async (req, res) => {
         id: 1,
         name: playerName,
         isCurrentPlayer: true,
-        avatar: `/avatars/avatar-${Math.floor(Math.random() * 10) + 1}.png`
+        avatar: `/avatars/characters/character${Math.floor(Math.random() * 20) + 1}.png`
       }],
       settings: {
         playerCount,
@@ -34,11 +34,11 @@ router.post('/create', async (req, res) => {
         wordCategory
       }
     });
-    
+
     await game.save();
-    
-    res.status(201).json({ 
-      success: true, 
+
+    res.status(201).json({
+      success: true,
       gameCode,
       playerId: 1
     });
@@ -52,35 +52,35 @@ router.post('/create', async (req, res) => {
 router.post('/join', async (req, res) => {
   try {
     const { gameCode, playerName } = req.body;
-    
+
     // Find the game
     const game = await Game.findOne({ gameCode });
-    
+
     if (!game) {
       return res.status(404).json({ success: false, message: 'Game not found' });
     }
-    
+
     if (game.status !== 'waiting') {
       return res.status(400).json({ success: false, message: 'Game has already started' });
     }
-    
+
     if (game.players.length >= game.settings.playerCount) {
       return res.status(400).json({ success: false, message: 'Game is full' });
     }
-    
+
     // Add the player to the game
     const playerId = game.players.length + 1;
     game.players.push({
       id: playerId,
       name: playerName,
       isCurrentPlayer: false,
-      avatar: `/avatars/avatar-${Math.floor(Math.random() * 10) + 1}.png`
+      avatar: `/avatars/characters/character${Math.floor(Math.random() * 20) + 1}.png`
     });
-    
+
     await game.save();
-    
-    res.status(200).json({ 
-      success: true, 
+
+    res.status(200).json({
+      success: true,
       gameCode,
       playerId
     });
@@ -94,16 +94,16 @@ router.post('/join', async (req, res) => {
 router.get('/:gameCode', async (req, res) => {
   try {
     const { gameCode } = req.params;
-    
+
     // Find the game
     const game = await Game.findOne({ gameCode });
-    
+
     if (!game) {
       return res.status(404).json({ success: false, message: 'Game not found' });
     }
-    
-    res.status(200).json({ 
-      success: true, 
+
+    res.status(200).json({
+      success: true,
       game: {
         gameCode: game.gameCode,
         status: game.status,
@@ -125,30 +125,30 @@ router.get('/:gameCode', async (req, res) => {
 router.post('/:gameCode/start', async (req, res) => {
   try {
     const { gameCode } = req.params;
-    
+
     // Find the game
     const game = await Game.findOne({ gameCode });
-    
+
     if (!game) {
       return res.status(404).json({ success: false, message: 'Game not found' });
     }
-    
+
     if (game.status !== 'waiting') {
       return res.status(400).json({ success: false, message: 'Game has already started' });
     }
-    
+
     // Get a random word pair using our new utility function
     const randomPair = getRandomWordPair(game.settings.wordCategory);
-    
+
     // Assign roles and words to players
     const playerCount = game.players.length;
     const undercoverCount = Math.max(1, Math.floor(playerCount / 4));
     const whiteCount = game.settings.includeWhite ? 1 : 0;
     const civilianCount = playerCount - undercoverCount - whiteCount;
-    
+
     // Shuffle players
     const shuffledPlayers = [...game.players].sort(() => 0.5 - Math.random());
-    
+
     // Assign roles
     for (let i = 0; i < shuffledPlayers.length; i++) {
       if (i < civilianCount) {
@@ -162,14 +162,14 @@ router.post('/:gameCode/start', async (req, res) => {
         shuffledPlayers[i].word = '';
       }
     }
-    
+
     // Update game
     game.status = 'active';
     game.gamePhase = 'reveal';
     game.players = shuffledPlayers;
     game.civilianWord = randomPair.civilian;
     game.undercoverWord = randomPair.undercover;
-    
+
     // Add system message
     game.messages.push({
       id: 'system-' + Date.now(),
@@ -177,9 +177,9 @@ router.post('/:gameCode/start', async (req, res) => {
       content: 'Game has started! Check your role and word.',
       isSystem: true
     });
-    
+
     await game.save();
-    
+
     res.status(200).json({ success: true });
   } catch (error) {
     console.error('Error starting game:', error);
@@ -214,17 +214,17 @@ router.post('/rooms', auth, async (req, res) => {
   try {
     const { settings } = req.body;
     const userId = req.user.id;
-    
+
     // Get user details
     const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
-    
+
     // Generate a unique room code
     let roomCode;
     let isUnique = false;
-    
+
     while (!isUnique) {
       roomCode = GameRoom.generateRoomCode();
       const existingRoom = await GameRoom.findOne({ roomCode });
@@ -232,7 +232,7 @@ router.post('/rooms', auth, async (req, res) => {
         isUnique = true;
       }
     }
-    
+
     // Create the game room
     const gameRoom = new GameRoom({
       roomCode,
@@ -246,9 +246,9 @@ router.post('/rooms', auth, async (req, res) => {
       }],
       settings: settings || {}
     });
-    
+
     await gameRoom.save();
-    
+
     res.status(201).json({
       success: true,
       room: {
@@ -270,34 +270,34 @@ router.post('/rooms/join', auth, async (req, res) => {
   try {
     const { roomCode } = req.body;
     const userId = req.user.id;
-    
+
     // Find the game room
     const gameRoom = await GameRoom.findOne({ roomCode: roomCode.toUpperCase() });
     if (!gameRoom) {
       return res.status(404).json({ success: false, message: 'Game room not found' });
     }
-    
+
     // Check if the game is already in progress
     if (gameRoom.status !== 'waiting') {
       return res.status(400).json({ success: false, message: 'Game is already in progress' });
     }
-    
+
     // Check if the room is full
     if (gameRoom.isFull()) {
       return res.status(400).json({ success: false, message: 'Game room is full' });
     }
-    
+
     // Check if the player is already in the room
     if (gameRoom.hasPlayer(userId)) {
       return res.status(400).json({ success: false, message: 'You are already in this game room' });
     }
-    
+
     // Get user details
     const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
-    
+
     // Add the player to the room
     gameRoom.addPlayer({
       userId: userId,
@@ -306,9 +306,9 @@ router.post('/rooms/join', auth, async (req, res) => {
       avatarId: user.avatarId || 1,
       isReady: false
     });
-    
+
     await gameRoom.save();
-    
+
     res.json({
       success: true,
       room: {
@@ -330,18 +330,18 @@ router.get('/rooms/:roomCode', auth, async (req, res) => {
   try {
     const { roomCode } = req.params;
     const userId = req.user.id;
-    
+
     // Find the game room
     const gameRoom = await GameRoom.findOne({ roomCode: roomCode.toUpperCase() });
     if (!gameRoom) {
       return res.status(404).json({ success: false, message: 'Game room not found' });
     }
-    
+
     // Check if the player is in the room
     if (!gameRoom.hasPlayer(userId)) {
       return res.status(403).json({ success: false, message: 'You are not a member of this game room' });
     }
-    
+
     // Return room details (excluding sensitive info like words if game is in progress)
     const roomDetails = {
       roomCode: gameRoom.roomCode,
@@ -354,8 +354,8 @@ router.get('/rooms/:roomCode', auth, async (req, res) => {
         isReady: player.isReady,
         isAlive: player.isAlive,
         // Only include role and word for the current player if game is in progress
-        ...(gameRoom.status === 'in-progress' && player.userId.toString() === userId.toString() 
-          ? { role: player.role, word: player.word } 
+        ...(gameRoom.status === 'in-progress' && player.userId.toString() === userId.toString()
+          ? { role: player.role, word: player.word }
           : {})
       })),
       settings: gameRoom.settings,
@@ -364,7 +364,7 @@ router.get('/rooms/:roomCode', auth, async (req, res) => {
       // Only include winner if game is completed
       ...(gameRoom.status === 'completed' ? { winner: gameRoom.winner } : {})
     };
-    
+
     res.json({ success: true, room: roomDetails });
   } catch (error) {
     console.error('Error fetching game room:', error);
@@ -378,28 +378,28 @@ router.patch('/rooms/:roomCode/ready', auth, async (req, res) => {
     const { roomCode } = req.params;
     const { isReady } = req.body;
     const userId = req.user.id;
-    
+
     // Find the game room
     const gameRoom = await GameRoom.findOne({ roomCode: roomCode.toUpperCase() });
     if (!gameRoom) {
       return res.status(404).json({ success: false, message: 'Game room not found' });
     }
-    
+
     // Check if the game is already in progress
     if (gameRoom.status !== 'waiting') {
       return res.status(400).json({ success: false, message: 'Game is already in progress' });
     }
-    
+
     // Check if the player is in the room
     const playerIndex = gameRoom.players.findIndex(player => player.userId.toString() === userId.toString());
     if (playerIndex === -1) {
       return res.status(403).json({ success: false, message: 'You are not a member of this game room' });
     }
-    
+
     // Update ready status
     gameRoom.players[playerIndex].isReady = isReady;
     await gameRoom.save();
-    
+
     res.json({
       success: true,
       room: {
@@ -421,21 +421,21 @@ router.delete('/rooms/:roomCode/leave', auth, async (req, res) => {
   try {
     const { roomCode } = req.params;
     const userId = req.user.id;
-    
+
     // Find the game room
     const gameRoom = await GameRoom.findOne({ roomCode: roomCode.toUpperCase() });
     if (!gameRoom) {
       return res.status(404).json({ success: false, message: 'Game room not found' });
     }
-    
+
     // Check if the player is in the room
     if (!gameRoom.hasPlayer(userId)) {
       return res.status(403).json({ success: false, message: 'You are not a member of this game room' });
     }
-    
+
     // Remove the player from the room
     gameRoom.removePlayer(userId);
-    
+
     // If the host leaves, assign a new host or delete the room if empty
     if (gameRoom.hostId.toString() === userId.toString()) {
       if (gameRoom.players.length > 0) {
@@ -445,9 +445,9 @@ router.delete('/rooms/:roomCode/leave', auth, async (req, res) => {
         return res.json({ success: true, message: 'Game room deleted' });
       }
     }
-    
+
     await gameRoom.save();
-    
+
     res.json({ success: true, message: 'Left game room successfully' });
   } catch (error) {
     console.error('Error leaving game room:', error);
@@ -461,27 +461,27 @@ router.patch('/rooms/:roomCode/settings', auth, async (req, res) => {
     const { roomCode } = req.params;
     const { settings } = req.body;
     const userId = req.user.id;
-    
+
     // Find the game room
     const gameRoom = await GameRoom.findOne({ roomCode: roomCode.toUpperCase() });
     if (!gameRoom) {
       return res.status(404).json({ success: false, message: 'Game room not found' });
     }
-    
+
     // Check if the user is the host
     if (gameRoom.hostId.toString() !== userId.toString()) {
       return res.status(403).json({ success: false, message: 'Only the host can update game settings' });
     }
-    
+
     // Check if the game is already in progress
     if (gameRoom.status !== 'waiting') {
       return res.status(400).json({ success: false, message: 'Cannot update settings while game is in progress' });
     }
-    
+
     // Update settings
     gameRoom.settings = { ...gameRoom.settings, ...settings };
     await gameRoom.save();
-    
+
     res.json({
       success: true,
       room: {
