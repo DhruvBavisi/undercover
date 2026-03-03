@@ -1338,24 +1338,25 @@ io.on('connection', (socket) => {
       const room = await GameRoom.findOne({ roomCode: gameCode });
       if (!room) return;
 
-      // Only reset if it hasn't been reset yet to avoid multiple resets
-      if (room.status !== 'waiting') {
-        room.status = 'waiting';
-        room.currentPhase = '';
-        room.currentRound = 0;
-        room.rounds = [];
-        room.messages = [];
-        room.winner = '';
-        room.playAgainVotes = [];
-        room.players.forEach(p => {
-          p.role = '';
-          p.word = '';
-          p.isEliminated = false;
+      // Do not reset the room status to 'waiting' here or wipe data.
+      // This allows players still reading the Game Over screen to see roles/words.
+      // The room actually fully resets when the Host officially clicks "Start Game".
+      let changed = false;
+
+      // If a specific player clicked play again, just un-ready them
+      // (The emit doesn't currently strictly require playerId, we can reset all or just the requestor.
+      // For safety, let's un-ready the user if we can infer them, or just let them stay ready.
+      // Actually, since they just finished a game, let's un-ready everyone just to be safe 
+      // but keep the game data intact!)
+      room.players.forEach(p => {
+        if (p.isReady) {
           p.isReady = false;
-        });
+          changed = true;
+        }
+      });
 
+      if (changed) {
         await room.save();
-
         io.to(gameCode).emit('room-updated', {
           roomCode: room.roomCode,
           hostId: room.hostId,
