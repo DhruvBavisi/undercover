@@ -38,6 +38,14 @@ const gameRoomSchema = new mongoose.Schema({
     isEliminated: {
       type: Boolean,
       default: false
+    },
+    isDisconnected: {
+      type: Boolean,
+      default: false
+    },
+    disconnectedAt: {
+      type: Date,
+      default: null
     }
   }],
   status: {

@@ -166,104 +166,40 @@ io.on('connection', (socket) => {
   // Clean up mapping on disconnect
   socket.on('disconnect', async () => {
     console.log('Client disconnected:', socket.id);
-    // Find which user disconnected
-    let disconnectedUserId = null;
-    Object.keys(userSocketMap).forEach(userId => {
-      if (userSocketMap[userId] === socket.id) {
-        disconnectedUserId = userId;
-        delete userSocketMap[userId];
-      }
-    });
-
-    // If we know who disconnected, handle room cleanup
-    if (disconnectedUserId) {
-      try {
-        // Find any game rooms this user is in
-        const gameRooms = await GameRoom.find({
-          'players.userId': disconnectedUserId,
-          status: { $in: ['waiting', 'in-progress'] }
-        });
-
-        for (const gameRoom of gameRooms) {
-          if (gameRoom.status === 'waiting') {
-            // In waiting room, remove the player
-            gameRoom.players = gameRoom.players.filter(
-              p => p.userId.toString() !== disconnectedUserId
-            );
-
-            // If host left, reassign or delete room
-            if (gameRoom.hostId.toString() === disconnectedUserId) {
-              if (gameRoom.players.length > 0) {
-                gameRoom.hostId = gameRoom.players[0].userId;
-              } else {
-                await GameRoom.deleteOne({ _id: gameRoom._id });
-                io.to(gameRoom.roomCode).emit('room-deleted', { roomCode: gameRoom.roomCode });
-                continue;
-              }
-            }
-
-            await gameRoom.save();
-
-            // Notify remaining players
-            io.to(gameRoom.roomCode).emit('room-updated', {
-              roomCode: gameRoom.roomCode,
-              hostId: gameRoom.hostId,
-              players: gameRoom.players,
-              settings: gameRoom.settings,
-              status: gameRoom.status,
-              currentPhase: gameRoom.currentPhase,
-              currentRound: gameRoom.currentRound,
-              rounds: gameRoom.rounds || [],
-              messages: gameRoom.messages || [],
-              speakingOrder: gameRoom.rounds?.length > 0 ? gameRoom.rounds[gameRoom.currentRound - 1]?.speakingOrder : []
-            });
-
-            const disconnectedPlayer = gameRoom.players.find(p => p.userId.toString() === disconnectedUserId);
-            io.to(gameRoom.roomCode).emit('player-left', {
-              playerId: disconnectedUserId,
-              name: disconnectedPlayer?.username || disconnectedPlayer?.name || 'A player',
-              players: gameRoom.players,
-              hostId: gameRoom.hostId
-            });
-          } else if (gameRoom.status === 'in-progress') {
-            // During a game, mark the player as eliminated/disconnected
-            const playerIndex = gameRoom.players.findIndex(
-              p => p.userId.toString() === disconnectedUserId
-            );
-            if (playerIndex !== -1 && !gameRoom.players[playerIndex].isEliminated) {
-              gameRoom.players[playerIndex].isEliminated = true;
-              gameRoom.players[playerIndex].disconnected = true;
-              await gameRoom.save();
-
-              io.to(gameRoom.roomCode).emit('player-disconnected', {
-                playerId: disconnectedUserId,
-                username: gameRoom.players[playerIndex].username || gameRoom.players[playerIndex].name
-              });
-
-              // If it was this player's turn, skip to next
-              const currentRound = gameRoom.rounds[gameRoom.currentRound - 1];
-              if (currentRound && currentRound.playerTurn?.toString() === disconnectedUserId) {
-                const speakingOrder = currentRound.speakingOrder || [];
-                const currentIndex = speakingOrder.indexOf(disconnectedUserId);
-                if (currentIndex >= 0 && currentIndex < speakingOrder.length - 1) {
-                  currentRound.playerTurn = speakingOrder[currentIndex + 1];
-                  await gameRoom.save();
-                  io.to(gameRoom.roomCode).emit('next-turn', { playerId: currentRound.playerTurn });
-                } else {
-                  gameRoom.currentPhase = 'voting';
-                  await gameRoom.save();
-                  io.to(gameRoom.roomCode).emit('phase-change', {
-                    phase: 'voting',
-                    message: 'A player disconnected. Moving to voting phase.'
-                  });
-                }
-              }
-            }
+    try {
+      const { gameCode, playerId } = socket.data;
+      if (!gameCode || !playerId) {
+        // Fallback to remove from userSocketMap if they didn't join a game properly
+        Object.keys(userSocketMap).forEach(userId => {
+          if (userSocketMap[userId] === socket.id) {
+            delete userSocketMap[userId];
           }
-        }
-      } catch (err) {
-        console.error('Error handling disconnect cleanup:', err);
+        });
+        return;
       }
+
+      const room = await GameRoom.findOne({ roomCode: gameCode });
+      if (!room) return;
+
+      const player = room.players.find(
+        p => p.userId.toString() === playerId.toString()
+      );
+      if (!player) return;
+
+      // Mark player as disconnected but do NOT remove them
+      player.isDisconnected = true;
+      player.disconnectedAt = new Date();
+      await room.save();
+
+      // Notify all players in the room that this player disconnected
+      io.to(gameCode).emit('player-disconnected', {
+        playerId,
+        playerName: player.username,
+        message: `${player.username} has disconnected`
+      });
+
+    } catch (error) {
+      console.error('Disconnect handler error:', error);
     }
   });
 
@@ -603,6 +539,50 @@ io.on('connection', (socket) => {
     const { roomCode, userId } = data;
 
     try {
+      // Set socket data for the disconnect handler
+      const gameCode = roomCode;
+      const playerId = userId;
+      socket.data = { gameCode, playerId };
+
+      const room = await GameRoom.findOne({ roomCode: gameCode });
+      if (room) {
+        const existingPlayer = room.players.find(
+          p => p.userId.toString() === playerId?.toString()
+        );
+
+        if (existingPlayer && existingPlayer.isDisconnected) {
+          // Player is reconnecting — restore their session
+          existingPlayer.isDisconnected = false;
+          existingPlayer.disconnectedAt = null;
+          await room.save();
+
+          socket.join(gameCode);
+
+          // Send them their personal game state
+          const currentRoundData = room.rounds[room.currentRound - 1];
+          socket.emit('session-restored', {
+            gameCode: room.roomCode,
+            status: room.status,
+            currentPhase: room.currentPhase,
+            currentRound: room.currentRound,
+            speakingOrder: currentRoundData?.speakingOrder || [],
+            playerTurn: currentRoundData?.playerTurn || null,
+            role: existingPlayer.role,
+            word: existingPlayer.word,
+            messages: room.messages
+          });
+
+          // Notify others this player reconnected
+          io.to(gameCode).emit('player-reconnected', {
+            playerId,
+            playerName: existingPlayer.username,
+            message: `${existingPlayer.username} has reconnected`
+          });
+
+          return; // Skip the rest of join-room logic
+        }
+      }
+
       // Store socket ID in userSocketMap
       if (userId) {
         userSocketMap[userId.toString()] = socket.id;
@@ -1432,6 +1412,36 @@ io.on('connection', (socket) => {
   });
 
 });
+
+// Run every 60 seconds cleanup job
+setInterval(async () => {
+  try {
+    const rooms = await GameRoom.find({ status: 'in-progress' });
+    for (const room of rooms) {
+      const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+      let changed = false;
+
+      room.players.forEach(player => {
+        if (
+          player.isDisconnected &&
+          player.disconnectedAt < fiveMinutesAgo
+        ) {
+          player.isEliminated = true;
+          changed = true;
+          io.to(room.roomCode).emit('player-removed', {
+            playerId: player.userId,
+            playerName: player.username,
+            message: `${player.username} was removed after disconnecting`
+          });
+        }
+      });
+
+      if (changed) await room.save();
+    }
+  } catch (error) {
+    console.error('Cleanup job error:', error);
+  }
+}, 60000);
 
 // Start the server
 const PORT = process.env.PORT || 3001;

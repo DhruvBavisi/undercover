@@ -80,6 +80,7 @@ const OnlineGamePage = () => {
   const [localCurrentRound, setLocalCurrentRound] = useState(1);
   const [localGamePhase, setLocalGamePhase] = useState('waiting');
   const [confirmedVotes, setConfirmedVotes] = useState(new Set());
+  const [disconnectedPlayers, setDisconnectedPlayers] = useState(new Set());
   // Phase A: Elimination & Game Over state
   const [showEliminationReveal, setShowEliminationReveal] = useState(false);
   const [eliminationData, setEliminationData] = useState(null);
@@ -499,9 +500,59 @@ const OnlineGamePage = () => {
     // Add phase change listener
     socket.on('phase-change', handlePhaseChange);
 
+    const handlePlayerDisconnected = (data) => {
+      setDisconnectedPlayers(prev => new Set(prev).add(data.playerId));
+      toast({
+        title: `${data.playerName} disconnected`,
+        description: 'Waiting for them to reconnect...',
+        variant: 'default'
+      });
+    };
+
+    const handlePlayerReconnected = (data) => {
+      setDisconnectedPlayers(prev => {
+        const next = new Set(prev);
+        next.delete(data.playerId);
+        return next;
+      });
+      toast({
+        title: `${data.playerName} reconnected`,
+        variant: 'default'
+      });
+    };
+
+    const handleSessionRestored = (data) => {
+      setLocalGamePhase(data.currentPhase || 'description');
+      setLocalCurrentRound(data.currentRound || 1);
+      if (data.speakingOrder?.length > 0) {
+        setSpeakingOrder(data.speakingOrder);
+        setCurrentTurn(data.speakingOrder[0]);
+      }
+      if (data.messages?.length > 0) {
+        const mapped = data.messages.map(msg => ({
+          id: msg.id || msg._id,
+          playerName: msg.playerName,
+          userId: msg.playerId,
+          content: msg.content,
+          isDescription: msg.isDescription || false,
+          isSystem: msg.isSystem || false,
+          round: msg.round,
+          timestamp: msg.timestamp
+        }));
+        setMessages(mapped);
+      }
+    };
+
+    socket.on('player-disconnected', handlePlayerDisconnected);
+    socket.on('player-reconnected', handlePlayerReconnected);
+    socket.on('session-restored', handleSessionRestored);
+
     // Clean up listener
     return () => {
       socket.off('phase-change', handlePhaseChange);
+      socket.off('player-disconnected', handlePlayerDisconnected);
+      socket.off('player-reconnected', handlePlayerReconnected);
+      socket.off('session-restored', handleSessionRestored);
     };
   }, [socket, room]);
 
@@ -518,6 +569,29 @@ const OnlineGamePage = () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [room?.roomCode, fetchRoom]);
+
+  // Save session when game starts or role is received
+  useEffect(() => {
+    if (room?.roomCode && user?.id && playerRole && playerWord !== undefined) {
+      const session = {
+        gameCode: room.roomCode,
+        userId: user.id,
+        username: user.username,
+        avatarId: user.avatarId,
+        role: playerRole,
+        word: playerWord,
+        timestamp: Date.now()
+      };
+      localStorage.setItem('game_session', JSON.stringify(session));
+    }
+  }, [room?.roomCode, user?.id, playerRole, playerWord]);
+
+  // Clear session on game over
+  useEffect(() => {
+    if (winner || gameWinner || showGameOver) {
+      localStorage.removeItem('game_session');
+    }
+  }, [winner, gameWinner, showGameOver]);
 
   // Add chat message submission handler
   const handleChatSubmit = (e) => {
@@ -880,7 +954,7 @@ const OnlineGamePage = () => {
           <div
             key={`player-${player.userId || player.id}`}
             className={`flex items-center justify-between p-2 rounded-lg transition-all ${isCurrentPlayer ? 'bg-blue-600/30 border border-blue-500' : 'bg-gray-700/30'
-              }`}
+              } ${disconnectedPlayers.has((player.userId || player.id)?.toString()) ? 'opacity-40 grayscale' : ''}`}
           >
             <div className="flex items-center gap-3">
               <div className="relative">
@@ -901,6 +975,9 @@ const OnlineGamePage = () => {
               </div>
               <div>
                 <div className="font-medium text-sm">{player.name}</div>
+                {disconnectedPlayers.has((player.userId || player.id)?.toString()) && (
+                  <span className="text-xs text-red-400 animate-pulse block mb-0.5">Disconnected</span>
+                )}
                 {isCurrentPlayer && (
                   <div className="text-xs text-blue-400">Speaking now...</div>
                 )}
@@ -1155,6 +1232,7 @@ const OnlineGamePage = () => {
 
   // Handle play again
   const handlePlayAgain = () => {
+    localStorage.removeItem('game_session');
     if (!socket || !room) return;
     socket.emit('play-again', {
       gameCode: room.roomCode
@@ -1294,7 +1372,7 @@ const OnlineGamePage = () => {
                       {room?.players?.map((player) => (
                         <div
                           key={`player-waiting-${player.userId || player.id}`}
-                          className={`flex items-center justify-between p-2 rounded-lg bg-gray-700/30`}
+                          className={`flex items-center justify-between p-2 rounded-lg bg-gray-700/30 ${disconnectedPlayers.has((player.userId || player.id)?.toString()) ? 'opacity-40 grayscale' : ''}`}
                         >
                           <div className="flex items-center gap-2">
                             <div className="w-8 h-8 bg-gray-600 rounded-full flex items-center justify-center">
@@ -1309,6 +1387,11 @@ const OnlineGamePage = () => {
                               )}
                             </div>
                             <span>{player.name}</span>
+                            {disconnectedPlayers.has((player.userId || player.id)?.toString()) && (
+                              <span className="text-xs text-red-400 animate-pulse ml-2 block">
+                                Disconnected
+                              </span>
+                            )}
                           </div>
                           {readyPlayers?.has(player.id) && (
                             <span className="text-sm text-green-400">Ready</span>
@@ -1553,6 +1636,7 @@ const OnlineGamePage = () => {
               <Button
                 variant="destructive"
                 onClick={() => {
+                  localStorage.removeItem('game_session');
                   leave();
                   navigate('/');
                 }}

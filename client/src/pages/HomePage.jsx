@@ -25,7 +25,7 @@ import {
   DropdownMenuTrigger,
 } from "../components/ui/dropdown-menu"
 import { motion } from "framer-motion"
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import Starfield from "../components/Starfield"
 
 // Custom scrollbar styles
@@ -202,6 +202,29 @@ export default function HomePage() {
   const { isAuthenticated, user, logout } = useAuth();
   const navigate = useNavigate();
 
+  const [showRejoinAlert, setShowRejoinAlert] = useState(false);
+  const [pendingSession, setPendingSession] = useState(null);
+
+  useEffect(() => {
+    const saved = localStorage.getItem('game_session');
+    if (saved) {
+      try {
+        const session = JSON.parse(saved);
+        const thirtyMinutes = 30 * 60 * 1000;
+        if (Date.now() - session.timestamp < thirtyMinutes) {
+          setPendingSession(session);
+          // Small delay so the page renders before alert slides in
+          setTimeout(() => setShowRejoinAlert(true), 800);
+        } else {
+          // Session too old — clear it
+          localStorage.removeItem('game_session');
+        }
+      } catch {
+        localStorage.removeItem('game_session');
+      }
+    }
+  }, []);
+
   // Add scrollbar styles to the document
   useEffect(() => {
     const styleSheet = document.createElement("style");
@@ -305,6 +328,50 @@ export default function HomePage() {
           </div>
         </div>
       </header>
+
+      {/* Rejoin Alert — slides down from behind navbar */}
+      <div
+        className={`fixed top-0 left-0 right-0 z-40 transition-transform duration-500 ease-in-out ${showRejoinAlert ? 'translate-y-[60px] sm:translate-y-[70px]' : '-translate-y-full'}`}
+      >
+        <div className="mx-auto max-w-lg mt-1 mx-4 sm:mx-auto bg-gray-900 border border-indigo-500/50 rounded-b-2xl shadow-2xl overflow-hidden">
+          <div className="px-5 py-4">
+            <p className="text-sm font-semibold text-white mb-1">
+              Rejoin Game?
+            </p>
+            <p className="text-xs text-gray-400 mb-4">
+              You were in an active game:
+              <span className="text-indigo-400 font-mono ml-1">
+                {pendingSession?.gameCode}
+              </span>
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowRejoinAlert(false);
+                  setTimeout(() => {
+                    navigate(`/game/${pendingSession.gameCode}`);
+                  }, 300);
+                }}
+                className="flex-1 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold transition-colors"
+              >
+                Continue Game
+              </button>
+              <button
+                onClick={() => {
+                  setShowRejoinAlert(false);
+                  localStorage.removeItem('game_session');
+                  setPendingSession(null);
+                }}
+                className="flex-1 py-2 rounded-xl bg-gray-700 hover:bg-gray-600 text-white text-sm font-semibold transition-colors"
+              >
+                Leave Game
+              </button>
+            </div>
+          </div>
+          {/* Thin accent line at bottom of alert */}
+          <div className="h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-indigo-500" />
+        </div>
+      </div>
 
       <div className="container mx-auto px-4 pt-24 pb-16 relative z-10">
         <section className="py-16 md:py-24">
