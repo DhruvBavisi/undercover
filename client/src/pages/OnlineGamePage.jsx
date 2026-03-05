@@ -103,6 +103,7 @@ const OnlineGamePage = () => {
   const descriptionInputRef = useRef(null);
   const cluesScrollRef = useRef(null);
   const chatScrollRef = useRef(null);
+  const turnStartTimeRef = useRef(null);
   const [activeTab, setActiveTab] = useState('clues'); // For tabbed interface: 'clues' or 'chat'
   const [playerSelections, setPlayerSelections] = useState({}); // Track other players' unconfirmed selections
   const [showLobby, setShowLobby] = useState(false); // Track whether lobby is open
@@ -188,6 +189,7 @@ const OnlineGamePage = () => {
       setSpeakingOrder(data.speakingOrder);
       setCurrentTurn(data.speakingOrder[0]);
       setTimerActive(true);
+      turnStartTimeRef.current = Date.now();
       // Sync the round counter from the server (single source of truth)
       if (data.currentRound) {
         setMessages(prev => {
@@ -232,6 +234,7 @@ const OnlineGamePage = () => {
       if (data.playerId) {
         setCurrentTurn(data.playerId);
         setTimerActive(true);
+        turnStartTimeRef.current = Date.now();
         console.log('Current turn updated to:', data.playerId);
       } else {
         console.error('Next turn event received with invalid playerId:', data);
@@ -536,10 +539,16 @@ const OnlineGamePage = () => {
           content: msg.content,
           isDescription: msg.isDescription || false,
           isSystem: msg.isSystem || false,
+          isRoundHeader: msg.isRoundHeader || false,
           round: msg.round,
           timestamp: msg.timestamp
         }));
         setMessages(mapped);
+      }
+
+      // Also emit authenticate so server maps the socket to this userId
+      if (user?.id) {
+        socket.emit('authenticate', { userId: user.id });
       }
     };
 
@@ -557,9 +566,28 @@ const OnlineGamePage = () => {
   }, [socket, room]);
 
   useEffect(() => {
+    if (socket && user?.id) {
+      socket.emit('authenticate', { userId: user.id });
+    }
+  }, [socket, user?.id]);
+
+  useEffect(() => {
     const handleVisibilityChange = async () => {
       if (document.visibilityState === 'visible' && room?.roomCode) {
         await fetchRoom(room.roomCode);
+
+        // Recalculate how much time is left in the current turn
+        if (turnStartTimeRef.current && timerActive) {
+          const elapsed = Math.floor((Date.now() - turnStartTimeRef.current) / 1000);
+          const totalDuration = room?.settings?.roundTime || 60;
+          const remaining = Math.max(0, totalDuration - elapsed);
+          setTimeLeft(remaining);
+
+          // If time has already expired, treat it as expired
+          if (remaining === 0) {
+            setTimerActive(false);
+          }
+        }
       }
     };
 

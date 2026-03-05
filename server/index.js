@@ -558,6 +558,12 @@ io.on('connection', (socket) => {
 
           socket.join(gameCode);
 
+          // Update userSocketMap to ensure future targeted emissions reach this reconnected socket
+          if (playerId) {
+            userSocketMap[playerId.toString()] = socket.id;
+            console.log(`Updated userSocketMap on reconnect: ${playerId} -> ${socket.id}`);
+          }
+
           // Send them their personal game state
           const currentRoundData = room.rounds[room.currentRound - 1];
           socket.emit('session-restored', {
@@ -570,6 +576,12 @@ io.on('connection', (socket) => {
             role: existingPlayer.role,
             word: existingPlayer.word,
             messages: room.messages
+          });
+
+          // Deliver their private role and word info since they might have missed it
+          socket.emit('role-info', {
+            role: existingPlayer.role,
+            word: existingPlayer.word
           });
 
           // Notify others this player reconnected
@@ -793,12 +805,18 @@ io.on('connection', (socket) => {
         const turnDuration = gameRoom.settings.roundTime || 60;
 
         const startTurnTimer = (rCode, duration) => {
+          if (!gameTimeouts[rCode]) gameTimeouts[rCode] = { version: 0 };
+          gameTimeouts[rCode].version = (gameTimeouts[rCode].version || 0) + 1;
+          const myVersion = gameTimeouts[rCode].version;
+
           // Clear any existing timer
-          if (gameTimeouts[rCode]?.turnTimeout) {
+          if (gameTimeouts[rCode].turnTimeout) {
             clearTimeout(gameTimeouts[rCode].turnTimeout);
           }
 
           const turnTimeout = setTimeout(async () => {
+            if (gameTimeouts[rCode]?.version !== myVersion) return;
+
             try {
               const updatedRoom = await GameRoom.findOne({ roomCode: rCode });
               if (!updatedRoom || updatedRoom.currentPhase !== 'discussion') {
@@ -845,9 +863,6 @@ io.on('connection', (socket) => {
             }
           }, duration * 1000);
 
-          if (!gameTimeouts[rCode]) {
-            gameTimeouts[rCode] = {};
-          }
           gameTimeouts[rCode].turnTimeout = turnTimeout;
         };
 
@@ -935,10 +950,15 @@ io.on('connection', (socket) => {
         // Restart turn timer for the next player
         const turnDuration = gameRoom.settings.roundTime || 60;
         const startTurnTimer = (rCode, duration) => {
-          if (gameTimeouts[rCode]?.turnTimeout) {
+          if (!gameTimeouts[rCode]) gameTimeouts[rCode] = { version: 0 };
+          gameTimeouts[rCode].version = (gameTimeouts[rCode].version || 0) + 1;
+          const myVersion = gameTimeouts[rCode].version;
+
+          if (gameTimeouts[rCode].turnTimeout) {
             clearTimeout(gameTimeouts[rCode].turnTimeout);
           }
           const turnTimeout = setTimeout(async () => {
+            if (gameTimeouts[rCode]?.version !== myVersion) return;
             try {
               const updatedRoom = await GameRoom.findOne({ roomCode: rCode });
               if (!updatedRoom || updatedRoom.currentPhase !== 'discussion') return;
@@ -971,7 +991,7 @@ io.on('connection', (socket) => {
               console.error('Error in turn timer:', err);
             }
           }, duration * 1000);
-          if (!gameTimeouts[rCode]) gameTimeouts[rCode] = {};
+
           gameTimeouts[rCode].turnTimeout = turnTimeout;
         };
         startTurnTimer(gameCode, turnDuration);
@@ -1280,10 +1300,15 @@ io.on('connection', (socket) => {
       // Start the turn timer for the new round
       const turnDuration = gameRoom.settings.roundTime || 60;
       const startTurnTimer = (rCode, duration) => {
-        if (gameTimeouts[rCode]?.turnTimeout) {
+        if (!gameTimeouts[rCode]) gameTimeouts[rCode] = { version: 0 };
+        gameTimeouts[rCode].version = (gameTimeouts[rCode].version || 0) + 1;
+        const myVersion = gameTimeouts[rCode].version;
+
+        if (gameTimeouts[rCode].turnTimeout) {
           clearTimeout(gameTimeouts[rCode].turnTimeout);
         }
         const turnTimeout = setTimeout(async () => {
+          if (gameTimeouts[rCode]?.version !== myVersion) return;
           try {
             const updatedRoom = await GameRoom.findOne({ roomCode: rCode });
             if (!updatedRoom || updatedRoom.currentPhase !== 'discussion') return;
@@ -1316,7 +1341,7 @@ io.on('connection', (socket) => {
             console.error('Error in turn timer:', err);
           }
         }, duration * 1000);
-        if (!gameTimeouts[rCode]) gameTimeouts[rCode] = {};
+
         gameTimeouts[rCode].turnTimeout = turnTimeout;
       };
       startTurnTimer(roomCode, turnDuration);

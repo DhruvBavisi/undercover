@@ -130,6 +130,53 @@ router.post('/rooms/join', auth, async (req, res) => {
     // Check if the game is already in progress, handle as spectator
     const isSpectator = gameRoom.status !== 'waiting';
 
+    // Check if this is a disconnected player trying to rejoin
+    const existingPlayer = gameRoom.players.find(
+      p => p.userId.toString() === userId.toString()
+    );
+
+    if (existingPlayer && existingPlayer.isDisconnected) {
+      // Restore the player — clear disconnection flags
+      existingPlayer.isDisconnected = false;
+      existingPlayer.disconnectedAt = null;
+      await gameRoom.save();
+
+      // Return full room state so frontend can restore game UI
+      return res.json({
+        success: true,
+        rejoined: true,
+        room: {
+          roomCode: gameRoom.roomCode,
+          hostId: gameRoom.hostId,
+          players: gameRoom.players.map(player => ({
+            userId: player.userId,
+            name: player.name,
+            username: player.username,
+            avatarId: player.avatarId,
+            isReady: player.isReady,
+            isEliminated: player.isEliminated,
+            isDisconnected: player.isDisconnected,
+            ...((gameRoom.status === 'completed') ||
+              player.userId.toString() === userId.toString()
+              ? { role: player.role, word: player.word }
+              : {})
+          })),
+          settings: gameRoom.settings,
+          status: gameRoom.status,
+          currentPhase: gameRoom.currentPhase,
+          currentRound: gameRoom.currentRound,
+          rounds: gameRoom.rounds || [],
+          messages: gameRoom.messages || [],
+          speakingOrder: gameRoom.rounds?.length > 0
+            ? gameRoom.rounds[gameRoom.currentRound - 1]?.speakingOrder
+            : [],
+          ...(gameRoom.status === 'completed'
+            ? { winner: gameRoom.winner, words: gameRoom.words }
+            : {})
+        }
+      });
+    }
+
     // Check if the room is full
     // Spectators can still join even if room is "full" of active players? We will let them join
     if (!isSpectator && gameRoom.isFull()) {
