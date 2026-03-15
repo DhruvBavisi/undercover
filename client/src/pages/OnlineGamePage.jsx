@@ -627,14 +627,30 @@ const OnlineGamePage = () => {
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.hidden) {
-        // Tab went to background -> emit backgrounded event
+        // Tab went to background -> emit backgrounded event and mark as disconnected locally
         if (socket && room?.roomCode && user?.id) {
           socket.emit('player-backgrounded', { roomCode: room.roomCode, userId: user.id });
         }
+        // Locally mark current user as disconnected while tab is hidden
+        if (user?.id) {
+          setDisconnectedPlayers(prev => {
+            const next = new Set(prev);
+            next.add(user.id.toString());
+            return next;
+          });
+        }
       } else {
-        // Tab foregrounded -> emit foregrounded event and sync state
+        // Tab foregrounded -> emit foregrounded event, clear local disconnect, and sync state
         if (socket && room?.roomCode && user?.id) {
           socket.emit('player-foregrounded', { roomCode: room.roomCode, userId: user.id });
+        }
+        // Remove current user from disconnected set when tab is visible again
+        if (user?.id) {
+          setDisconnectedPlayers(prev => {
+            const next = new Set(prev);
+            next.delete(user.id.toString());
+            return next;
+          });
         }
         syncGameState();
         // Recalculate timer
@@ -1072,11 +1088,6 @@ const OnlineGamePage = () => {
                     />
                   </div>
                 </div>
-                {isCurrentPlayer && (
-                  <div className="absolute -top-1 -right-1 bg-blue-500 rounded-full w-5 h-5 flex items-center justify-center">
-                    <span className="text-[10px] text-white font-bold">🎤</span>
-                  </div>
-                )}
               </div>
               <div>
                 <div className="font-medium text-sm">{player.name}</div>
@@ -1105,8 +1116,8 @@ const OnlineGamePage = () => {
     );
   };
 
-  // Loading state — show while room is being fetched or before initial fetch completes
-  if (loading || (!room && !initialFetchDone)) {
+  // Loading state — only show full-page loader on initial fetch, not during background refreshes
+  if (!initialFetchDone && (loading || !room)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-900">
         <Starfield />
@@ -1648,12 +1659,12 @@ const OnlineGamePage = () => {
                     <div className="flex items-center gap-2">
                       <MessageCircle className="h-4 w-4" />
                       Clues
-                      {unreadClues > 0 && activeTab !== 'clues' && (
-                        <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[16px] text-center">
-                          {unreadClues > 99 ? '99+' : unreadClues}
-                        </span>
-                      )}
                     </div>
+                    {unreadClues > 0 && activeTab !== 'clues' && (
+                      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[16px] h-4 flex items-center justify-center px-1">
+                        {unreadClues > 99 ? '99+' : unreadClues}
+                      </span>
+                    )}
                   </button>
                   <button
                     onClick={() => { setActiveTab('chat'); setUnreadChats(0); }}
@@ -1664,12 +1675,12 @@ const OnlineGamePage = () => {
                     <div className="flex items-center gap-2">
                       <Users className="h-4 w-4" />
                       Discussion
-                      {unreadChats > 0 && activeTab !== 'chat' && (
-                        <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[16px] text-center">
-                          {unreadChats > 99 ? '99+' : unreadChats}
-                        </span>
-                      )}
                     </div>
+                    {unreadChats > 0 && activeTab !== 'chat' && (
+                      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[16px] h-4 flex items-center justify-center px-1">
+                        {unreadChats > 99 ? '99+' : unreadChats}
+                      </span>
+                    )}
                   </button>
                 </div>
               </CardHeader>
