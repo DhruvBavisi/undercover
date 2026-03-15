@@ -437,7 +437,8 @@ export const GameRoomProvider = ({ children }) => {
 
       if (response.success) {
         console.log('Game room joined successfully:', response.room);
-        debouncedSetRoom(response.room);
+        // Use direct setRoom for immediate redirect trigger (not debounced)
+        setRoom(response.room);
 
         // CRITICAL: If rejoining, restore role and word immediately from
         // the dedicated player field — don't rely solely on room.players parsing
@@ -457,8 +458,8 @@ export const GameRoomProvider = ({ children }) => {
           }
         }
 
-        // Return success so callers can know it worked
-        return true;
+        // Return full response so callers can inspect it
+        return response;
       } else {
         console.error('Failed to join game room:', response.message);
         setError(response.message || 'Failed to join game room');

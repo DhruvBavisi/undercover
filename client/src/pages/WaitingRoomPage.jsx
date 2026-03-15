@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useGameRoom } from '../context/GameRoomContext';
+import { useSocket } from '../context/SocketContext.jsx';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '../components/ui/card';
 import { Loader2, Copy, ArrowLeft, Users, RefreshCw, Crown, AlertTriangle, Home, Menu, Settings, Plus, Minus } from 'lucide-react';
@@ -44,9 +45,11 @@ export default function WaitingRoomPage() {
     areAllPlayersReady,
     updateSettings
   } = useGameRoom();
+  const socket = useSocket();
   const { toast } = useToast();
   const [initialFetchDone, setInitialFetchDone] = useState(false);
   const [isRedirecting, setIsRedirecting] = useState(false);
+  const [disconnectedPlayers, setDisconnectedPlayers] = useState(new Set());
   const redirectTimeoutRef = useRef(null);
   const updateTimeoutRef = useRef(null);
 
@@ -191,7 +194,7 @@ export default function WaitingRoomPage() {
     if (room) {
       console.log('Room status check for redirection/reset:', room.status);
 
-      if ((room.status === 'in-progress' || room.status === 'completed') && !isRedirecting) {
+      if (room.status === 'in-progress' && !isRedirecting) {
         console.log('Game is active/completed, redirecting to online game page...');
         setIsRedirecting(true);
 
@@ -217,6 +220,93 @@ export default function WaitingRoomPage() {
       }
     };
   }, [room, navigate, gameCode, isRedirecting]);
+
+  // Visibility change — fires when player returns to tab/app
+  useEffect(() => {
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState === 'visible' && gameCode) {
+        await fetchRoom(gameCode);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleVisibilityChange);
+    window.addEventListener('pageshow', handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleVisibilityChange);
+      window.removeEventListener('pageshow', handleVisibilityChange);
+    };
+  }, [gameCode, fetchRoom]);
+
+  // Mobile polling fallback — polls every 6s to catch missed events
+  useEffect(() => {
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    if (!isMobile || !gameCode) return;
+
+    const interval = setInterval(async () => {
+      if (document.visibilityState === 'visible') {
+        await fetchRoom(gameCode);
+      }
+    }, 6000);
+
+    return () => clearInterval(interval);
+  }, [gameCode, fetchRoom]);
+
+  // Socket reconnect — re-join room after connection drop
+  useEffect(() => {
+    if (!socket || !gameCode || !user?.id) return;
+
+    const handleReconnect = () => {
+      socket.emit('authenticate', { userId: user.id });
+      socket.emit('join-room', { roomCode: gameCode, userId: user.id });
+      fetchRoom(gameCode);
+    };
+
+    socket.on('connect', handleReconnect);
+    return () => socket.off('connect', handleReconnect);
+  }, [socket, gameCode, user?.id, fetchRoom]);
+
+  // Disconnected player tracking
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleDisconnected = (data) => {
+      setDisconnectedPlayers(prev =>
+        new Set(prev).add(data.playerId?.toString() || data.userId?.toString())
+      );
+    };
+
+    const handleReconnected = (data) => {
+      setDisconnectedPlayers(prev => {
+        const next = new Set(prev);
+        next.delete(data.playerId?.toString());
+        return next;
+      });
+    };
+
+    const handleRoomUpdate = (updatedRoom) => {
+      if (updatedRoom?.players) {
+        const stillDisconnected = new Set(
+          updatedRoom.players
+            .filter(p => p.isDisconnected)
+            .map(p => p.userId?.toString())
+        );
+        setDisconnectedPlayers(stillDisconnected);
+      }
+    };
+
+    socket.on('player-disconnected', handleDisconnected);
+    socket.on('player-reconnected', handleReconnected);
+    socket.on('room-updated', handleRoomUpdate);
+
+    return () => {
+      socket.off('player-disconnected', handleDisconnected);
+      socket.off('player-reconnected', handleReconnected);
+      socket.off('room-updated', handleRoomUpdate);
+    };
+  }, [socket]);
 
   // Copy game code to clipboard
   const copyGameCode = () => {
@@ -599,20 +689,25 @@ export default function WaitingRoomPage() {
               {room?.players.map(player => (
                 <div
                   key={player.userId}
-                  className="flex items-center justify-between bg-gray-700/30 rounded-lg p-4"
+                  className={`flex items-center justify-between bg-gray-700/30 rounded-lg p-4 transition-opacity duration-300 ${disconnectedPlayers.has(player.userId?.toString()) ? 'opacity-40 grayscale' : 'opacity-100'}`}
                 >
                   <div className="flex items-center">
                     <div className={`w-10 h-10 rounded-xl mr-3 flex-shrink-0 ${getAvatarById(player.avatarId || 1).bgColor}`}>
                       <div className={`w-full h-full flex items-center justify-center rounded-xl overflow-hidden`}>
                         <img
                           src={`/avatars/characters/character${player.avatarId || '1'}.png`}
-                          alt={player.name}
+                          alt={player.name || player.username || 'Player'}
                           className="w-full h-full object-cover scale-125 transform"
                         />
                       </div>
                     </div>
                     <div>
-                      <p className="font-medium text-white">{player.name}</p>
+                      <p className="font-medium text-white">
+                        {player.name || player.username || 'Player'}
+                        {disconnectedPlayers.has(player.userId?.toString()) && (
+                          <span className="text-xs text-red-400 animate-pulse ml-2">Disconnected</span>
+                        )}
+                      </p>
                     </div>
                   </div>
                   <div className="flex items-center space-x-2">

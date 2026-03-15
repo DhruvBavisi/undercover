@@ -1411,38 +1411,41 @@ io.on('connection', (socket) => {
       const room = await GameRoom.findOne({ roomCode: gameCode });
       if (!room) return;
 
-      // Do not reset the room status to 'waiting' here or wipe data.
-      // This allows players still reading the Game Over screen to see roles/words.
-      // The room actually fully resets when the Host officially clicks "Start Game".
-      let changed = false;
+      // Full reset so waiting room loads correctly
+      room.status = 'waiting';
+      room.currentPhase = '';
+      room.currentRound = 0;
+      room.rounds = [];
+      room.messages = [];
+      room.winner = '';
+      room.words = { civilian: '', undercover: '' };
+      room.playAgainVotes = [];
 
-      // If a specific player clicked play again, just un-ready them
-      // (The emit doesn't currently strictly require playerId, we can reset all or just the requestor.
-      // For safety, let's un-ready the user if we can infer them, or just let them stay ready.
-      // Actually, since they just finished a game, let's un-ready everyone just to be safe 
-      // but keep the game data intact!)
+      // Reset all players
       room.players.forEach(p => {
-        if (p.isReady) {
-          p.isReady = false;
-          changed = true;
-        }
+        p.role = '';
+        p.word = '';
+        p.isEliminated = false;
+        p.isReady = false;
+        p.isDisconnected = false;
+        p.disconnectedAt = null;
       });
 
-      if (changed) {
-        await room.save();
-        io.to(gameCode).emit('room-updated', {
-          roomCode: room.roomCode,
-          hostId: room.hostId,
-          players: room.players,
-          settings: room.settings,
-          status: room.status,
-          currentPhase: room.currentPhase,
-          currentRound: room.currentRound,
-          rounds: room.rounds,
-          messages: room.messages,
-          speakingOrder: []
-        });
-      }
+      await room.save();
+
+      io.to(gameCode).emit('room-updated', {
+        roomCode: room.roomCode,
+        hostId: room.hostId,
+        players: room.players,
+        settings: room.settings,
+        status: room.status,
+        currentPhase: room.currentPhase,
+        currentRound: room.currentRound,
+        rounds: [],
+        messages: [],
+        speakingOrder: []
+      });
+
     } catch (err) {
       console.error('Error handling play-again:', err);
     }

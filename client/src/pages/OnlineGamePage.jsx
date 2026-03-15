@@ -533,31 +533,7 @@ const OnlineGamePage = () => {
     // Add phase change listener
     socket.on('phase-change', handlePhaseChange);
 
-    const handlePlayerDisconnected = (data) => {
-      setDisconnectedPlayers(prev => new Set(prev).add(data.playerId));
-      toast({
-        title: `${data.playerName} disconnected`,
-        description: 'Waiting for them to reconnect...',
-        variant: 'default'
-      });
-      // Refresh room silently to update the player.isDisconnected flag in the overarching state
-      if (room?.roomCode) silentRefreshRoom(room.roomCode);
-    };
-
-    const handlePlayerReconnected = (data) => {
-      setDisconnectedPlayers(prev => {
-        const next = new Set(prev);
-        next.delete(data.playerId);
-        return next;
-      });
-      toast({
-        title: `${data.playerName} reconnected`,
-        variant: 'default'
-      });
-      // Refresh room silently to clear the player.isDisconnected flag in the overarching state
-      if (room?.roomCode) silentRefreshRoom(room.roomCode);
-    };
-
+    // Session restored handler — processes server-sent game state on rejoin
     const handleSessionRestored = (data) => {
       setLocalGamePhase(data.currentPhase || 'discussion');
       setLocalCurrentRound(data.currentRound || 1);
@@ -598,15 +574,11 @@ const OnlineGamePage = () => {
       }
     };
 
-    socket.on('player-disconnected', handlePlayerDisconnected);
-    socket.on('player-reconnected', handlePlayerReconnected);
     socket.on('session-restored', handleSessionRestored);
 
     // Clean up listener
     return () => {
       socket.off('phase-change', handlePhaseChange);
-      socket.off('player-disconnected', handlePlayerDisconnected);
-      socket.off('player-reconnected', handlePlayerReconnected);
       socket.off('session-restored', handleSessionRestored);
     };
   }, [socket, room]);
@@ -617,32 +589,63 @@ const OnlineGamePage = () => {
     }
   }, [socket, user?.id]);
 
-  useEffect(() => {
-    const handleVisibilityChange = async () => {
-      if (document.visibilityState === 'visible' && room?.roomCode) {
-        await fetchRoom(room.roomCode);
+  // Sync game state when returning from background — uses silentRefreshRoom to avoid loading flash
+  const syncInProgressRef = useRef(false);
 
-        // Recalculate how much time is left in the current turn
+  const syncGameState = useCallback(async () => {
+    if (syncInProgressRef.current || !room?.roomCode) return;
+    syncInProgressRef.current = true;
+    try {
+      await silentRefreshRoom(room.roomCode);
+      if (socket && user?.id) {
+        socket.emit('authenticate', { userId: user.id });
+        socket.emit('join-room', { roomCode: room.roomCode, userId: user.id });
+      }
+    } finally {
+      syncInProgressRef.current = false;
+    }
+  }, [room?.roomCode, socket, user?.id, silentRefreshRoom]);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        syncGameState();
+        // Recalculate timer
         if (turnStartTimeRef.current && timerActive) {
           const elapsed = Math.floor((Date.now() - turnStartTimeRef.current) / 1000);
-          const totalDuration = room?.settings?.roundTime || 60;
-          const remaining = Math.max(0, totalDuration - elapsed);
+          const total = room?.settings?.roundTime || 60;
+          const remaining = Math.max(0, total - elapsed);
           setTimeLeft(remaining);
-
-          // If time has already expired, treat it as expired
-          if (remaining === 0) {
-            setTimerActive(false);
-          }
+          if (remaining === 0) setTimerActive(false);
         }
       }
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleVisibilityChange);
+    window.addEventListener('pageshow', handleVisibilityChange);
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleVisibilityChange);
+      window.removeEventListener('pageshow', handleVisibilityChange);
     };
-  }, [room?.roomCode, fetchRoom]);
+  }, [syncGameState, timerActive, room?.settings?.roundTime]);
+
+  // Mobile polling — only when game is active
+  useEffect(() => {
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    if (!isMobile || !room?.roomCode) return;
+    if (localGamePhase === 'gameOver' || showGameOver) return;
+
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        syncGameState();
+      }
+    }, 8000);
+
+    return () => clearInterval(interval);
+  }, [room?.roomCode, localGamePhase, showGameOver, syncGameState]);
 
   // Save session when game starts or role is received
   useEffect(() => {
@@ -1075,11 +1078,17 @@ const OnlineGamePage = () => {
     );
   };
 
-  // Loading state
-  if (loading) {
+  // Loading state — show while room is being fetched or before initial fetch completes
+  if (loading || (!room && !initialFetchDone)) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin" />
+      <div className="min-h-screen flex items-center justify-center bg-gray-900">
+        <Starfield />
+        <div className="relative z-10 flex flex-col items-center gap-4">
+          <Loader2 className="h-10 w-10 animate-spin text-indigo-400" />
+          <p className="text-gray-400 text-sm">
+            {isRejoinFlow ? 'Rejoining game...' : 'Loading game...'}
+          </p>
+        </div>
       </div>
     );
   }
@@ -1117,8 +1126,8 @@ const OnlineGamePage = () => {
     );
   }
 
-  // Room not found state
-  if (!room) {
+  // Room not found — only show when loading is complete and fetch has run
+  if (!room && initialFetchDone && !loading) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 text-white relative overflow-hidden flex items-center justify-center">
         <Starfield />
@@ -1309,9 +1318,10 @@ const OnlineGamePage = () => {
   const handlePlayAgain = () => {
     localStorage.removeItem('game_session');
     if (!socket || !room) return;
-    socket.emit('play-again', {
-      gameCode: room.roomCode
-    });
+
+    socket.emit('play-again', { gameCode: room.roomCode });
+
+    // Reset ALL local game state
     setGameWinner(null);
     setVotes({});
     setMessages([]);
@@ -1323,6 +1333,12 @@ const OnlineGamePage = () => {
     setGameOverData(null);
     setEliminationData(null);
     setMrWhiteGuessResult(null);
+    setInitialFetchDone(false);
+    setDisconnectedPlayers(new Set());
+    setConfirmedVotes(new Set());
+    setPlayerSelections({});
+
+    // Navigate to waiting room
     navigate(`/game/${room.roomCode}`);
   };
 

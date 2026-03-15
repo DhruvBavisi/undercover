@@ -1,6 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { createBrowserRouter, RouterProvider } from 'react-router-dom';
+import { createBrowserRouter, RouterProvider, Outlet } from 'react-router-dom';
 import App from './App.jsx';
 import './index.css';
 import HomePage from './pages/HomePage.jsx';
@@ -36,6 +36,14 @@ const AppProviders = ({ children }) => {
   );
 };
 
+// Shared layout — single GameRoomProvider for all game routes
+// so navigating /game ↔ /online-game preserves room/role/word state
+const GameLayout = () => (
+  <GameRoomProvider>
+    <Outlet />
+  </GameRoomProvider>
+);
+
 // Create router with the wrapper
 const router = createBrowserRouter([
   {
@@ -55,37 +63,15 @@ const router = createBrowserRouter([
         index: true,
         element: <HomePage />
       },
+      // Shared GameRoomProvider for all game-related routes
       {
-        path: 'create',
-        element: (
-          <GameRoomProvider>
-            <CreateGamePage />
-          </GameRoomProvider>
-        )
-      },
-      {
-        path: 'join',
-        element: (
-          <GameRoomProvider>
-            <JoinGamePage />
-          </GameRoomProvider>
-        )
-      },
-      {
-        path: 'game/:gameCode',
-        element: (
-          <GameRoomProvider>
-            <WaitingRoomPage />
-          </GameRoomProvider>
-        )
-      },
-      {
-        path: 'online-game/:gameCode',
-        element: (
-          <GameRoomProvider>
-            <OnlineGamePage />
-          </GameRoomProvider>
-        )
+        element: <GameLayout />,
+        children: [
+          { path: 'create', element: <CreateGamePage /> },
+          { path: 'join', element: <JoinGamePage /> },
+          { path: 'game/:gameCode', element: <WaitingRoomPage /> },
+          { path: 'online-game/:gameCode', element: <OnlineGamePage /> },
+        ]
       },
       { path: 'how-to-play', element: <HowToPlayPage /> },
       { path: 'offline', element: <OfflinePage /> },

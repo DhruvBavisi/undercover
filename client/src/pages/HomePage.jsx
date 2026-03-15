@@ -27,6 +27,8 @@ import {
 import { motion } from "framer-motion"
 import { useEffect, useState } from "react"
 import Starfield from "../components/Starfield"
+import { API_URL } from '../config'
+import { useToast } from '../hooks/use-toast'
 
 // Custom scrollbar styles
 const customStyles = `
@@ -199,7 +201,8 @@ const BackgroundCircles = () => {
 
 
 export default function HomePage() {
-  const { isAuthenticated, user, logout } = useAuth();
+  const { isAuthenticated, user, logout, token } = useAuth();
+  const { toast } = useToast();
   const navigate = useNavigate();
 
   const [showRejoinAlert, setShowRejoinAlert] = useState(false);
@@ -346,13 +349,46 @@ export default function HomePage() {
             </p>
             <div className="flex gap-3">
               <button
-                onClick={() => {
+                onClick={async () => {
                   setShowRejoinAlert(false);
                   if (!pendingSession?.gameCode) return;
-                  navigate(
-                    `/online-game/${pendingSession.gameCode}?rejoin=true`,
-                    { replace: true }
-                  );
+
+                  try {
+                    const response = await fetch(
+                      `${API_URL}/game-rooms/rooms/join`,
+                      {
+                        method: 'POST',
+                        headers: {
+                          'Content-Type': 'application/json',
+                          'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify({ roomCode: pendingSession.gameCode })
+                      }
+                    );
+                    const data = await response.json();
+
+                    if (data.success) {
+                      navigate(
+                        `/online-game/${pendingSession.gameCode}`,
+                        { replace: true }
+                      );
+                    } else {
+                      // Game ended or room gone
+                      localStorage.removeItem('game_session');
+                      setPendingSession(null);
+                      toast({
+                        title: "Game no longer available",
+                        description: data.message || "The game has ended or the room was closed.",
+                        variant: "destructive"
+                      });
+                    }
+                  } catch (err) {
+                    // Network error — navigate anyway, let game page handle it
+                    navigate(
+                      `/online-game/${pendingSession.gameCode}`,
+                      { replace: true }
+                    );
+                  }
                 }}
                 className="flex-1 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold transition-colors"
               >
