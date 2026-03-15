@@ -225,7 +225,7 @@ export default function WaitingRoomPage() {
   useEffect(() => {
     const handleVisibilityChange = async () => {
       if (document.visibilityState === 'visible' && gameCode) {
-        await fetchRoom(gameCode);
+        await fetchRoom(gameCode, true); // silent fetch
       }
     };
 
@@ -247,7 +247,7 @@ export default function WaitingRoomPage() {
 
     const interval = setInterval(async () => {
       if (document.visibilityState === 'visible') {
-        await fetchRoom(gameCode);
+        await fetchRoom(gameCode, true); // silent fetch
       }
     }, 6000);
 

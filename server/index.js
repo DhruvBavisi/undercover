@@ -1405,6 +1405,49 @@ io.on('connection', (socket) => {
     }
   });
 
+  // Handle background/foreground tab state manually
+  socket.on('player-backgrounded', async ({ roomCode, userId }) => {
+    try {
+      const room = await GameRoom.findOne({ roomCode });
+      if (!room) return;
+
+      const player = room.players.find(p => p.userId.toString() === userId.toString());
+      if (player && !player.isDisconnected) {
+        player.isDisconnected = true;
+        player.disconnectedAt = new Date();
+        await room.save();
+
+        io.to(roomCode).emit('player-disconnected', {
+          playerId: userId,
+          playerName: player.username || player.name
+        });
+      }
+    } catch (err) {
+      console.error('Error handling player-backgrounded:', err);
+    }
+  });
+
+  socket.on('player-foregrounded', async ({ roomCode, userId }) => {
+    try {
+      const room = await GameRoom.findOne({ roomCode });
+      if (!room) return;
+
+      const player = room.players.find(p => p.userId.toString() === userId.toString());
+      if (player && player.isDisconnected) {
+        player.isDisconnected = false;
+        player.disconnectedAt = null;
+        await room.save();
+
+        io.to(roomCode).emit('player-reconnected', {
+          playerId: userId,
+          playerName: player.username || player.name
+        });
+      }
+    } catch (err) {
+      console.error('Error handling player-foregrounded:', err);
+    }
+  });
+
   // Handle play-again
   socket.on('play-again', async ({ gameCode }) => {
     try {

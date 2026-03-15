@@ -109,6 +109,8 @@ const OnlineGamePage = () => {
   const chatScrollRef = useRef(null);
   const turnStartTimeRef = useRef(null);
   const [activeTab, setActiveTab] = useState('clues'); // For tabbed interface: 'clues' or 'chat'
+  const [unreadChats, setUnreadChats] = useState(0); // Track unread chats
+  const [unreadClues, setUnreadClues] = useState(0); // Track unread clues
   const [playerSelections, setPlayerSelections] = useState({}); // Track other players' unconfirmed selections
   const [showLobby, setShowLobby] = useState(false); // Track whether lobby is open
 
@@ -184,6 +186,14 @@ const OnlineGamePage = () => {
         if (prev.some(m => m.id === newMessage.id)) return prev;
         return [...prev, newMessage];
       });
+
+      // Increment unread chat counter if chat tab is not active
+      setActiveTab(currentActiveTab => {
+        if (currentActiveTab !== 'chat') {
+          setUnreadChats(prev => prev + 1);
+        }
+        return currentActiveTab;
+      });
       // Auto-scroll is handled by the useEffect on [messages]
     };
 
@@ -228,6 +238,14 @@ const OnlineGamePage = () => {
       setMessages(prev => {
         if (prev.some(m => m.id === newMessage.id)) return prev;
         return [...prev, newMessage];
+      });
+
+      // Increment unread clues counter if clues tab is not active
+      setActiveTab(currentActiveTab => {
+        if (currentActiveTab !== 'clues') {
+          setUnreadClues(prev => prev + 1);
+        }
+        return currentActiveTab;
       });
       // Auto-scroll is handled by the useEffect on [messages]
     };
@@ -608,7 +626,16 @@ const OnlineGamePage = () => {
 
   useEffect(() => {
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
+      if (document.hidden) {
+        // Tab went to background -> emit backgrounded event
+        if (socket && room?.roomCode && user?.id) {
+          socket.emit('player-backgrounded', { roomCode: room.roomCode, userId: user.id });
+        }
+      } else {
+        // Tab foregrounded -> emit foregrounded event and sync state
+        if (socket && room?.roomCode && user?.id) {
+          socket.emit('player-foregrounded', { roomCode: room.roomCode, userId: user.id });
+        }
         syncGameState();
         // Recalculate timer
         if (turnStartTimeRef.current && timerActive) {
@@ -630,7 +657,7 @@ const OnlineGamePage = () => {
       window.removeEventListener('focus', handleVisibilityChange);
       window.removeEventListener('pageshow', handleVisibilityChange);
     };
-  }, [syncGameState, timerActive, room?.settings?.roundTime]);
+  }, [syncGameState, timerActive, room?.settings?.roundTime, socket, room?.roomCode, user?.id]);
 
   // Mobile polling — only when game is active
   useEffect(() => {
@@ -1388,11 +1415,10 @@ const OnlineGamePage = () => {
             <Button
               variant="ghost"
               size="icon"
-              className="text-gray-400 hover:text-white relative"
+              className="text-gray-400 hover:text-white"
               onClick={() => setShowLobby(true)}
             >
               <Users className="h-5 w-5" />
-              <span className="absolute top-1 right-1 w-2 h-2 bg-blue-500 rounded-full"></span>
             </Button>
 
             {room?.roomCode && (
@@ -1614,25 +1640,35 @@ const OnlineGamePage = () => {
               <CardHeader className="pb-0 border-b border-gray-700">
                 <div className="flex">
                   <button
-                    onClick={() => setActiveTab('clues')}
-                    className={`px-4 py-2 text-sm font-medium ${activeTab === 'clues'
+                    onClick={() => { setActiveTab('clues'); setUnreadClues(0); }}
+                    className={`px-4 py-2 text-sm font-medium relative ${activeTab === 'clues'
                       ? 'border-b-2 border-blue-500 text-blue-400'
                       : 'text-gray-400 hover:text-gray-300'}`}
                   >
                     <div className="flex items-center gap-2">
                       <MessageCircle className="h-4 w-4" />
                       Clues
+                      {unreadClues > 0 && activeTab !== 'clues' && (
+                        <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[16px] text-center">
+                          {unreadClues > 99 ? '99+' : unreadClues}
+                        </span>
+                      )}
                     </div>
                   </button>
                   <button
-                    onClick={() => setActiveTab('chat')}
-                    className={`px-4 py-2 text-sm font-medium ${activeTab === 'chat'
+                    onClick={() => { setActiveTab('chat'); setUnreadChats(0); }}
+                    className={`px-4 py-2 text-sm font-medium relative ${activeTab === 'chat'
                       ? 'border-b-2 border-blue-500 text-blue-400'
                       : 'text-gray-400 hover:text-gray-300'}`}
                   >
                     <div className="flex items-center gap-2">
                       <Users className="h-4 w-4" />
                       Discussion
+                      {unreadChats > 0 && activeTab !== 'chat' && (
+                        <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[16px] text-center">
+                          {unreadChats > 99 ? '99+' : unreadChats}
+                        </span>
+                      )}
                     </div>
                   </button>
                 </div>

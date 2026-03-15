@@ -78,7 +78,7 @@ export const GameRoomProvider = ({ children }) => {
   }, []);
 
   // Fetch a game room by code
-  const fetchRoom = useCallback(async (roomCode) => {
+  const fetchRoom = useCallback(async (roomCode, silent = false) => {
     if (!isAuthenticated) {
       console.log('User not authenticated, redirecting to login');
       navigate('/login');
@@ -92,8 +92,10 @@ export const GameRoomProvider = ({ children }) => {
       return;
     }
 
-    setLoading(true);
-    setError(null);
+    if (!silent) {
+      setLoading(true);
+      setError(null);
+    }
 
     try {
       console.log(`Fetching game room with code: ${roomCode}`);
@@ -119,9 +121,9 @@ export const GameRoomProvider = ({ children }) => {
       }
     } catch (err) {
       console.error('Error fetching game room:', err);
-      setError('An error occurred while fetching the game room');
+      if (!silent) setError('An error occurred while fetching the game room');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [isAuthenticated, token, navigate, debouncedSetRoom]);
 
