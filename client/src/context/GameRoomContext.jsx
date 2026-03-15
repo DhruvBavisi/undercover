@@ -115,6 +115,8 @@ export const GameRoomProvider = ({ children }) => {
             if (me.word !== undefined) setPlayerWord(me.word);
           }
         }
+
+        return response.room;
       } else {
         console.error('Failed to fetch game room:', response.message);
         setError(response.message || 'Failed to fetch game room');
@@ -125,6 +127,7 @@ export const GameRoomProvider = ({ children }) => {
     } finally {
       if (!silent) setLoading(false);
     }
+    return null;
   }, [isAuthenticated, token, navigate, debouncedSetRoom]);
 
   // Set up socket listeners when room changes

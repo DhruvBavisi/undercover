@@ -50,6 +50,7 @@ export default function WaitingRoomPage() {
   const [initialFetchDone, setInitialFetchDone] = useState(false);
   const [isRedirecting, setIsRedirecting] = useState(false);
   const [disconnectedPlayers, setDisconnectedPlayers] = useState(new Set());
+  const redirectingRef = useRef(false);
   const redirectTimeoutRef = useRef(null);
   const updateTimeoutRef = useRef(null);
 
@@ -211,6 +212,7 @@ export default function WaitingRoomPage() {
         // If room returns to waiting (e.g., play again), cleanly un-freeze
         console.log('Game is waiting, resetting redirecting state...');
         setIsRedirecting(false);
+        redirectingRef.current = false;
       }
     }
 
@@ -225,7 +227,14 @@ export default function WaitingRoomPage() {
   useEffect(() => {
     const handleVisibilityChange = async () => {
       if (document.visibilityState === 'visible' && gameCode) {
-        await fetchRoom(gameCode, true); // silent fetch
+        // Fetch latest room data and check if game started while in background
+        const roomData = await fetchRoom(gameCode, true);
+        if (roomData && roomData.status === 'in-progress' && !redirectingRef.current) {
+          redirectingRef.current = true;
+          console.log('Game started while in background, redirecting to game page...');
+          setIsRedirecting(true);
+          navigate(`/online-game/${gameCode}`);
+        }
       }
     };
 
@@ -238,7 +247,7 @@ export default function WaitingRoomPage() {
       window.removeEventListener('focus', handleVisibilityChange);
       window.removeEventListener('pageshow', handleVisibilityChange);
     };
-  }, [gameCode, fetchRoom]);
+  }, [gameCode, fetchRoom, navigate]);
 
   // Mobile polling fallback — polls every 6s to catch missed events
   useEffect(() => {
@@ -247,26 +256,38 @@ export default function WaitingRoomPage() {
 
     const interval = setInterval(async () => {
       if (document.visibilityState === 'visible') {
-        await fetchRoom(gameCode, true); // silent fetch
+        const roomData = await fetchRoom(gameCode, true);
+        if (roomData && roomData.status === 'in-progress' && !redirectingRef.current) {
+          redirectingRef.current = true;
+          console.log('Game started (detected via polling), redirecting to game page...');
+          setIsRedirecting(true);
+          navigate(`/online-game/${gameCode}`);
+        }
       }
     }, 6000);
 
     return () => clearInterval(interval);
-  }, [gameCode, fetchRoom]);
+  }, [gameCode, fetchRoom, navigate]);
 
   // Socket reconnect — re-join room after connection drop
   useEffect(() => {
     if (!socket || !gameCode || !user?.id) return;
 
-    const handleReconnect = () => {
+    const handleReconnect = async () => {
       socket.emit('authenticate', { userId: user.id });
       socket.emit('join-room', { roomCode: gameCode, userId: user.id });
-      fetchRoom(gameCode);
+      const roomData = await fetchRoom(gameCode);
+      if (roomData && roomData.status === 'in-progress' && !redirectingRef.current) {
+        redirectingRef.current = true;
+        console.log('Game started while disconnected, redirecting to game page...');
+        setIsRedirecting(true);
+        navigate(`/online-game/${gameCode}`);
+      }
     };
 
     socket.on('connect', handleReconnect);
     return () => socket.off('connect', handleReconnect);
-  }, [socket, gameCode, user?.id, fetchRoom]);
+  }, [socket, gameCode, user?.id, fetchRoom, navigate]);
 
   // Disconnected player tracking
   useEffect(() => {
