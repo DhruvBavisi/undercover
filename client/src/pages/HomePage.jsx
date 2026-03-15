@@ -348,9 +348,11 @@ export default function HomePage() {
               <button
                 onClick={() => {
                   setShowRejoinAlert(false);
-                  setTimeout(() => {
-                    navigate(`/game/${pendingSession.gameCode}`);
-                  }, 300);
+                  if (!pendingSession?.gameCode) return;
+                  navigate(
+                    `/online-game/${pendingSession.gameCode}?rejoin=true`,
+                    { replace: true }
+                  );
                 }}
                 className="flex-1 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold transition-colors"
               >

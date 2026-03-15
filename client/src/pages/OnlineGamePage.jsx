@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useGameRoom } from '../context/GameRoomContext';
 import { useSocket } from '../context/SocketContext.jsx';
 import { AnimatePresence } from 'framer-motion';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '../components/ui/card';
-import { Loader2, ArrowLeft, Users, MessageCircle, Clock, AlertCircle, Send, ThumbsUp, Check, X, Award, Crown, Skull, RefreshCcw, Pause, AlertTriangle, Home } from 'lucide-react';
+import { Loader2, ArrowLeft, Users, MessageCircle, Clock, AlertCircle, Send, ThumbsUp, Check, X, Award, Crown, Skull, RefreshCcw, Pause, AlertTriangle, Home, Copy } from 'lucide-react';
 import { useToast } from '../hooks/use-toast';
 import { Alert, AlertDescription } from '../components/ui/alert';
 import { Input } from '../components/ui/input';
@@ -39,6 +39,7 @@ const OnlineGamePage = () => {
     scores,
     readyPlayers,
     fetchRoom,
+    silentRefreshRoom,
     toggleReady,
     startGame,
     submitWordDescription,
@@ -51,6 +52,9 @@ const OnlineGamePage = () => {
   } = useGameRoom();
   const { toast } = useToast();
   const socket = useSocket();
+  const [searchParams] = useSearchParams();
+  const location = useLocation();
+  const isRejoinFlow = searchParams.get('rejoin') === 'true';
 
   // State
   const [timeLeft, setTimeLeft] = useState(0);
@@ -378,6 +382,28 @@ const OnlineGamePage = () => {
     };
   }, [socket, room]);
 
+  // Initial fetch on mount if room is missing or stale
+  useEffect(() => {
+    if (!gameCode || !isAuthenticated) return;
+
+    if (isRejoinFlow) {
+      // Silent refresh — don't trigger loading state
+      silentRefreshRoom(gameCode);
+      // Remove the query param after handling
+      navigate(location.pathname, { replace: true });
+    } else if (!room || room.roomCode !== gameCode) {
+      console.log('OnlineGamePage mount: Fetching room', gameCode);
+      fetchRoom(gameCode);
+    }
+  }, [gameCode, isAuthenticated]); // intentionally minimal to only fire once or on code change
+
+  // Always authenticate socket and emit join-room on mount
+  useEffect(() => {
+    if (!socket || !user?.id || !gameCode) return;
+    socket.emit('authenticate', { userId: user.id });
+    socket.emit('join-room', { roomCode: gameCode, userId: user.id });
+  }, [socket, user?.id, gameCode]);
+
   // Add useEffect for game phase initialization
   useEffect(() => {
     if (room?.status === 'in-progress' && !initialFetchDone) {
@@ -389,6 +415,10 @@ const OnlineGamePage = () => {
         setCurrentTurn(room.speakingOrder[0]);
       } else {
         // If speaking order is not available, fetch the room again
+        // This block is for when the room object itself might be stale or incomplete
+        // and we need to re-fetch it.
+        // The `isRejoinFlow` logic is handled in the `initGame` function or similar
+        // initial load logic, not typically here.
         fetchRoom(room.roomCode);
       }
 
@@ -510,6 +540,8 @@ const OnlineGamePage = () => {
         description: 'Waiting for them to reconnect...',
         variant: 'default'
       });
+      // Refresh room silently to update the player.isDisconnected flag in the overarching state
+      if (room?.roomCode) silentRefreshRoom(room.roomCode);
     };
 
     const handlePlayerReconnected = (data) => {
@@ -522,14 +554,19 @@ const OnlineGamePage = () => {
         title: `${data.playerName} reconnected`,
         variant: 'default'
       });
+      // Refresh room silently to clear the player.isDisconnected flag in the overarching state
+      if (room?.roomCode) silentRefreshRoom(room.roomCode);
     };
 
     const handleSessionRestored = (data) => {
-      setLocalGamePhase(data.currentPhase || 'description');
+      setLocalGamePhase(data.currentPhase || 'discussion');
       setLocalCurrentRound(data.currentRound || 1);
       if (data.speakingOrder?.length > 0) {
         setSpeakingOrder(data.speakingOrder);
-        setCurrentTurn(data.speakingOrder[0]);
+        setCurrentTurn(
+          data.playerTurn?.toString() ||
+          data.speakingOrder[0]?.toString()
+        );
       }
       if (data.messages?.length > 0) {
         const mapped = data.messages.map(msg => ({
@@ -544,6 +581,15 @@ const OnlineGamePage = () => {
           timestamp: msg.timestamp
         }));
         setMessages(mapped);
+      }
+
+      // Clear disconnected state for self
+      if (user?.id) {
+        setDisconnectedPlayers(prev => {
+          const next = new Set(prev);
+          next.delete(user.id.toString());
+          return next;
+        });
       }
 
       // Also emit authenticate so server maps the socket to this userId
@@ -883,7 +929,8 @@ const OnlineGamePage = () => {
                 ? 'bg-red-600/40 ring-2 ring-red-500'
                 : isSelected
                   ? 'bg-amber-600/40 ring-2 ring-amber-500'
-                  : 'bg-gray-700/30 hover:bg-gray-700/50'}`}
+                  : 'bg-gray-700/30 hover:bg-gray-700/50'}
+              ${disconnectedPlayers.has((player.userId || player.id)?.toString()) || player.isDisconnected ? 'opacity-40 grayscale' : ''}`}
             disabled={playerId === user.id || player.isEliminated || confirmedVotes.has(user.id) || isCurrentUserEliminated || isCurrentUserSpectator}
           >
             <div className="flex items-center gap-3">
@@ -982,7 +1029,7 @@ const OnlineGamePage = () => {
           <div
             key={`player-${player.userId || player.id}`}
             className={`flex items-center justify-between p-2 rounded-lg transition-all ${isCurrentPlayer ? 'bg-blue-600/30 border border-blue-500' : 'bg-gray-700/30'
-              } ${disconnectedPlayers.has((player.userId || player.id)?.toString()) ? 'opacity-40 grayscale' : ''}`}
+              } ${disconnectedPlayers.has((player.userId || player.id)?.toString()) || player.isDisconnected ? 'opacity-40 grayscale' : ''}`}
           >
             <div className="flex items-center gap-3">
               <div className="relative">
@@ -1003,7 +1050,7 @@ const OnlineGamePage = () => {
               </div>
               <div>
                 <div className="font-medium text-sm">{player.name}</div>
-                {disconnectedPlayers.has((player.userId || player.id)?.toString()) && (
+                {(disconnectedPlayers.has((player.userId || player.id)?.toString()) || player.isDisconnected) && (
                   <span className="text-xs text-red-400 animate-pulse block mb-0.5">Disconnected</span>
                 )}
                 {isCurrentPlayer && (
@@ -1331,6 +1378,23 @@ const OnlineGamePage = () => {
               <Users className="h-5 w-5" />
               <span className="absolute top-1 right-1 w-2 h-2 bg-blue-500 rounded-full"></span>
             </Button>
+
+            {room?.roomCode && (
+              <div
+                className="hidden sm:flex items-center gap-2 bg-gray-800/80 px-3 py-1.5 rounded-full border border-gray-700 cursor-pointer hover:bg-gray-700 transition"
+                onClick={() => {
+                  navigator.clipboard.writeText(room.roomCode);
+                  toast({
+                    title: "Game Code Copied",
+                    description: "The game code has been copied to your clipboard.",
+                  });
+                }}
+              >
+                <span className="text-gray-400 text-xs">Room:</span>
+                <span className="text-indigo-400 font-mono font-bold tracking-wider">{room.roomCode}</span>
+                <Copy className="h-3 w-3 text-gray-400" />
+              </div>
+            )}
           </div>
           <div className="flex items-center gap-4">
             <GameTimer
@@ -1400,7 +1464,7 @@ const OnlineGamePage = () => {
                       {room?.players?.map((player) => (
                         <div
                           key={`player-waiting-${player.userId || player.id}`}
-                          className={`flex items-center justify-between p-2 rounded-lg bg-gray-700/30 ${disconnectedPlayers.has((player.userId || player.id)?.toString()) ? 'opacity-40 grayscale' : ''}`}
+                          className={`flex items-center justify-between p-2 rounded-lg bg-gray-700/30 ${disconnectedPlayers.has((player.userId || player.id)?.toString()) || player.isDisconnected ? 'opacity-40 grayscale' : ''}`}
                         >
                           <div className="flex items-center gap-2">
                             <div className="w-8 h-8 bg-gray-600 rounded-full flex items-center justify-center">
@@ -1415,7 +1479,7 @@ const OnlineGamePage = () => {
                               )}
                             </div>
                             <span>{player.name}</span>
-                            {disconnectedPlayers.has((player.userId || player.id)?.toString()) && (
+                            {(disconnectedPlayers.has((player.userId || player.id)?.toString()) || player.isDisconnected) && (
                               <span className="text-xs text-red-400 animate-pulse ml-2 block">
                                 Disconnected
                               </span>
@@ -1712,9 +1776,10 @@ const OnlineGamePage = () => {
               {room?.players?.map((player) => {
                 const isTrueEliminated = player.isEliminated && player.role !== 'spectator';
                 const isSpectator = player.role === 'spectator';
+                const isDisconnected = disconnectedPlayers.has((player.userId || player.id)?.toString()) || player.isDisconnected;
 
                 return (
-                  <div key={player.userId || player.id} className={`flex items-center justify-between p-2.5 rounded-lg ${isTrueEliminated ? 'bg-gray-900/60' : 'bg-gray-700/50'}`}>
+                  <div key={player.userId || player.id} className={`flex items-center justify-between p-2.5 rounded-lg ${isTrueEliminated ? 'bg-gray-900/60' : 'bg-gray-700/50'} ${isDisconnected ? 'opacity-40 grayscale' : ''}`}>
                     <div className="flex items-center gap-3">
                       <div className={`w-10 h-10 rounded-xl flex-shrink-0 ${isTrueEliminated ? 'opacity-50' : ''} ${getAvatarById(player.avatarId || 1).bgColor}`}>
                         <div className={`h-full w-full flex items-center justify-center rounded-xl overflow-hidden`}>
@@ -1738,6 +1803,10 @@ const OnlineGamePage = () => {
                         {isTrueEliminated ? (
                           <span className="text-[10px] uppercase tracking-wider text-red-400/80 font-semibold bg-red-900/30 px-1.5 py-0.5 rounded">
                             Eliminated
+                          </span>
+                        ) : isDisconnected ? (
+                          <span className="text-[10px] uppercase tracking-wider text-red-400/80 font-semibold bg-red-900/30 px-1.5 py-0.5 rounded animate-pulse">
+                            Disconnected
                           </span>
                         ) : isSpectator ? (
                           <span className="text-[10px] uppercase tracking-wider text-blue-400/80 font-semibold bg-blue-900/30 px-1.5 py-0.5 rounded">

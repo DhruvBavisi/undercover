@@ -45,7 +45,7 @@ export default function JoinGamePage() {
   // Redirect to game room if joined
   useEffect(() => {
     if (room && !loading) {
-      if (room.status === 'in-progress') {
+      if (room.status === 'in-progress' || room.status === 'completed') {
         navigate(`/online-game/${room.roomCode}`);
       } else {
         navigate(`/game/${room.roomCode}`);

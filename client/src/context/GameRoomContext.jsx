@@ -77,6 +77,54 @@ export const GameRoomProvider = ({ children }) => {
     }, 300); // 300ms debounce time
   }, []);
 
+  // Fetch a game room by code
+  const fetchRoom = useCallback(async (roomCode) => {
+    if (!isAuthenticated) {
+      console.log('User not authenticated, redirecting to login');
+      navigate('/login');
+      return;
+    }
+
+    if (!token) {
+      console.error('No authentication token available');
+      setError('Authentication error. Please log in again.');
+      setTimeout(() => navigate('/login'), 2000);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      console.log(`Fetching game room with code: ${roomCode}`);
+      const response = await getRoom(roomCode, token);
+
+      if (response.success) {
+        console.log('Game room fetched successfully:', response.room);
+        debouncedSetRoom(response.room);
+
+        // Ensure local context has role and word explicitly set when fetching
+        if (user?.id && response.room.players) {
+          const me = response.room.players.find(
+            p => p.userId?.toString() === user.id.toString()
+          );
+          if (me) {
+            if (me.role) setPlayerRole(me.role);
+            if (me.word !== undefined) setPlayerWord(me.word);
+          }
+        }
+      } else {
+        console.error('Failed to fetch game room:', response.message);
+        setError(response.message || 'Failed to fetch game room');
+      }
+    } catch (err) {
+      console.error('Error fetching game room:', err);
+      setError('An error occurred while fetching the game room');
+    } finally {
+      setLoading(false);
+    }
+  }, [isAuthenticated, token, navigate, debouncedSetRoom]);
+
   // Set up socket listeners when room changes
   useEffect(() => {
     if (!socket || !room || !user) {
@@ -232,12 +280,39 @@ export const GameRoomProvider = ({ children }) => {
       setTimeout(() => setError(null), 3000);
     };
 
+    // Listen for session restoration
+    const handleSessionRestored = (data) => {
+      console.log('Session restored via socket:', data);
+
+      // Update room state if data includes room info or we need to refresh
+      if (data.status) {
+        setRoom(prev => ({
+          ...prev,
+          status: data.status,
+          currentPhase: data.currentPhase,
+          currentRound: data.currentRound
+        }));
+      }
+
+      setGamePhase(data.currentPhase || 'description');
+      setCurrentRound(data.currentRound || 1);
+
+      if (data.role) setPlayerRole(data.role);
+      if (data.word !== undefined) setPlayerWord(data.word);
+
+      // If we're missing full room data, trigger a fetch
+      if (data.gameCode) {
+        fetchRoom(data.gameCode);
+      }
+    };
+
     // Set up event listeners
     socket.on('room-updated', handleRoomUpdate);
     socket.on('game-started', handleGameStart);
     socket.on('player-left', handlePlayerLeft);
     socket.on(`role-${user?.id}`, handleRoleAssignment);
     socket.on('role-info', handleRoleAssignment);
+    socket.on('session-restored', handleSessionRestored);
     socket.on('error', handleError);
     socket.on('player-ready-update', handlePlayerReady);
     socket.on('voting-results', (data) => {
@@ -259,12 +334,13 @@ export const GameRoomProvider = ({ children }) => {
       socket.off('player-left', handlePlayerLeft);
       socket.off(`role-${user?.id}`, handleRoleAssignment);
       socket.off('role-info', handleRoleAssignment);
+      socket.off('session-restored', handleSessionRestored);
       socket.off('error', handleError);
       socket.off('player-ready-update', handlePlayerReady);
       socket.off('voting-results');
       socket.off('vote-submitted');
     };
-  }, [socket, room?.roomCode, user?.id, navigate, debouncedSetRoom]);
+  }, [socket, room?.roomCode, user?.id, navigate, debouncedSetRoom, fetchRoom]);
 
   useEffect(() => {
     if (!socket || !room) return;
@@ -362,6 +438,27 @@ export const GameRoomProvider = ({ children }) => {
       if (response.success) {
         console.log('Game room joined successfully:', response.room);
         debouncedSetRoom(response.room);
+
+        // CRITICAL: If rejoining, restore role and word immediately from
+        // the dedicated player field — don't rely solely on room.players parsing
+        if (response.rejoined && response.player) {
+          if (response.player.role) setPlayerRole(response.player.role);
+          if (response.player.word !== undefined) setPlayerWord(response.player.word);
+        }
+
+        // Ensure local context has role and word explicitly set when joining
+        if (user?.id && response.room.players) {
+          const me = response.room.players.find(
+            p => p.userId?.toString() === user.id.toString()
+          );
+          if (me) {
+            if (me.role) setPlayerRole(me.role);
+            if (me.word !== undefined) setPlayerWord(me.word);
+          }
+        }
+
+        // Return success so callers can know it worked
+        return true;
       } else {
         console.error('Failed to join game room:', response.message);
         setError(response.message || 'Failed to join game room');
@@ -374,42 +471,29 @@ export const GameRoomProvider = ({ children }) => {
     }
   };
 
-  // Fetch a game room by code
-  const fetchRoom = useCallback(async (roomCode) => {
-    if (!isAuthenticated) {
-      console.log('User not authenticated, redirecting to login');
-      navigate('/login');
-      return;
-    }
 
-    if (!token) {
-      console.error('No authentication token available');
-      setError('Authentication error. Please log in again.');
-      setTimeout(() => navigate('/login'), 2000);
-      return;
-    }
 
-    setLoading(true);
-    setError(null);
-
+  // Fetch a game room silently without triggering loading spinner
+  const silentRefreshRoom = useCallback(async (roomCode) => {
+    if (!token) return;
     try {
-      console.log(`Fetching game room with code: ${roomCode}`);
-      const response = await getRoom(roomCode, token);
-
-      if (response.success) {
-        console.log('Game room fetched successfully:', response.room);
-        debouncedSetRoom(response.room);
-      } else {
-        console.error('Failed to fetch game room:', response.message);
-        setError(response.message || 'Failed to fetch game room');
+      const response = await fetch(
+        `${API_URL}/game-rooms/rooms/${roomCode}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      const data = await response.json();
+      if (data.success) {
+        debouncedSetRoom(data.room);
+        const me = data.room.players.find(
+          p => p.userId?.toString() === user?.id?.toString()
+        );
+        if (me?.role) setPlayerRole(me.role);
+        if (me?.word !== undefined) setPlayerWord(me.word);
       }
     } catch (err) {
-      console.error('Error fetching game room:', err);
-      setError('An error occurred while fetching the game room');
-    } finally {
-      setLoading(false);
+      console.error('Silent refresh error:', err);
     }
-  }, [isAuthenticated, token, navigate, debouncedSetRoom]);
+  }, [token, user?.id, debouncedSetRoom]);
 
   // Set player ready status
   const setReady = async (isReady) => {
@@ -694,6 +778,7 @@ export const GameRoomProvider = ({ children }) => {
     create,
     join,
     fetchRoom,
+    silentRefreshRoom,
     setReady,
     leave,
     updateSettings: updateGameSettings,

@@ -186,13 +186,13 @@ export default function WaitingRoomPage() {
     fetchGameRoom();
   }, [fetchGameRoom]);
 
-  // Redirect to online game page if game is in progress
+  // Redirect to online game page if game is in progress or completed
   useEffect(() => {
     if (room) {
       console.log('Room status check for redirection/reset:', room.status);
 
-      if (room.status === 'in-progress' && !isRedirecting) {
-        console.log('Game is in progress, redirecting to online game page...');
+      if ((room.status === 'in-progress' || room.status === 'completed') && !isRedirecting) {
+        console.log('Game is active/completed, redirecting to online game page...');
         setIsRedirecting(true);
 
         // Clear any existing timeout
@@ -203,7 +203,7 @@ export default function WaitingRoomPage() {
         // Set a timeout to navigate after a short delay
         redirectTimeoutRef.current = setTimeout(() => {
           navigate(`/online-game/${gameCode}`);
-        }, 500);
+        }, 100);
       } else if (room.status === 'waiting' && isRedirecting) {
         // If room returns to waiting (e.g., play again), cleanly un-freeze
         console.log('Game is waiting, resetting redirecting state...');

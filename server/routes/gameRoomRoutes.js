@@ -7,6 +7,37 @@ import { Game } from '../src/game.js'; // Updated import path for Game model
 
 const router = express.Router();
 
+// Helper function to build standard room responses
+const buildRoomResponse = (gameRoom, userId) => ({
+  roomCode: gameRoom.roomCode,
+  hostId: gameRoom.hostId,
+  players: gameRoom.players.map(player => ({
+    userId: player.userId,
+    name: player.name,
+    username: player.username,
+    avatarId: player.avatarId,
+    isReady: player.isReady,
+    isEliminated: player.isEliminated,
+    isDisconnected: player.isDisconnected,
+    ...((gameRoom.status === 'completed' ||
+      player.userId.toString() === userId.toString())
+      ? { role: player.role, word: player.word }
+      : {})
+  })),
+  settings: gameRoom.settings,
+  status: gameRoom.status,
+  currentPhase: gameRoom.currentPhase,
+  currentRound: gameRoom.currentRound,
+  rounds: gameRoom.rounds || [],
+  messages: gameRoom.messages || [],
+  speakingOrder: gameRoom.rounds?.length > 0
+    ? gameRoom.rounds[gameRoom.currentRound - 1]?.speakingOrder || []
+    : [],
+  ...(gameRoom.status === 'completed'
+    ? { winner: gameRoom.winner, words: gameRoom.words }
+    : {})
+});
+
 // Get all word pack names
 router.get('/wordpacks', (req, res) => {
   try {
@@ -130,62 +161,55 @@ router.post('/rooms/join', auth, async (req, res) => {
     // Check if the game is already in progress, handle as spectator
     const isSpectator = gameRoom.status !== 'waiting';
 
-    // Check if this is a disconnected player trying to rejoin
     const existingPlayer = gameRoom.players.find(
       p => p.userId.toString() === userId.toString()
     );
 
+    // CASE 1: Player was in the game and is reconnecting
     if (existingPlayer && existingPlayer.isDisconnected) {
-      // Restore the player — clear disconnection flags
       existingPlayer.isDisconnected = false;
       existingPlayer.disconnectedAt = null;
       await gameRoom.save();
 
-      // Return full room state so frontend can restore game UI
       return res.json({
         success: true,
         rejoined: true,
-        room: {
-          roomCode: gameRoom.roomCode,
-          hostId: gameRoom.hostId,
-          players: gameRoom.players.map(player => ({
-            userId: player.userId,
-            name: player.name,
-            username: player.username,
-            avatarId: player.avatarId,
-            isReady: player.isReady,
-            isEliminated: player.isEliminated,
-            isDisconnected: player.isDisconnected,
-            ...((gameRoom.status === 'completed') ||
-              player.userId.toString() === userId.toString()
-              ? { role: player.role, word: player.word }
-              : {})
-          })),
-          settings: gameRoom.settings,
-          status: gameRoom.status,
-          currentPhase: gameRoom.currentPhase,
-          currentRound: gameRoom.currentRound,
-          rounds: gameRoom.rounds || [],
-          messages: gameRoom.messages || [],
-          speakingOrder: gameRoom.rounds?.length > 0
-            ? gameRoom.rounds[gameRoom.currentRound - 1]?.speakingOrder
-            : [],
-          ...(gameRoom.status === 'completed'
-            ? { winner: gameRoom.winner, words: gameRoom.words }
-            : {})
-        }
+        player: {
+          role: existingPlayer.role,
+          word: existingPlayer.word,
+          isEliminated: existingPlayer.isEliminated,
+          name: existingPlayer.name,
+          username: existingPlayer.username,
+          avatarId: existingPlayer.avatarId
+        },
+        room: buildRoomResponse(gameRoom, userId)
       });
     }
 
+    // CASE 2: Player is already in room and not disconnected
+    if (existingPlayer && !existingPlayer.isDisconnected) {
+      // They are already active — just return room state
+      // This handles the "duplicate join" case gracefully
+      return res.json({
+        success: true,
+        rejoined: true,
+        player: {
+          role: existingPlayer.role,
+          word: existingPlayer.word,
+          isEliminated: existingPlayer.isEliminated,
+          name: existingPlayer.name,
+          username: existingPlayer.username,
+          avatarId: existingPlayer.avatarId
+        },
+        room: buildRoomResponse(gameRoom, userId)
+      });
+    }
+
+    // CASE 3: Brand new player joining
     // Check if the room is full
     // Spectators can still join even if room is "full" of active players? We will let them join
     if (!isSpectator && gameRoom.isFull()) {
       return res.status(400).json({ success: false, message: 'Game room is full' });
-    }
-
-    // Check if the player is already in the room
-    if (gameRoom.hasPlayer(userId)) {
-      return res.status(400).json({ success: false, message: 'You are already in this game room' });
     }
 
     // Get user details
@@ -209,18 +233,7 @@ router.post('/rooms/join', auth, async (req, res) => {
 
     res.json({
       success: true,
-      room: {
-        roomCode: gameRoom.roomCode,
-        hostId: gameRoom.hostId,
-        players: gameRoom.players,
-        settings: gameRoom.settings,
-        status: gameRoom.status,
-        currentPhase: gameRoom.currentPhase,
-        currentRound: gameRoom.currentRound,
-        rounds: gameRoom.rounds || [],
-        messages: gameRoom.messages || [],
-        speakingOrder: gameRoom.rounds?.length > 0 ? gameRoom.rounds[gameRoom.currentRound - 1]?.speakingOrder : []
-      }
+      room: buildRoomResponse(gameRoom, userId)
     });
   } catch (error) {
     console.error('Error joining game room:', error);
@@ -246,32 +259,7 @@ router.get('/rooms/:roomCode', auth, async (req, res) => {
     }
 
     // Return room details (excluding sensitive info like words if game is in progress)
-    const roomDetails = {
-      roomCode: gameRoom.roomCode,
-      hostId: gameRoom.hostId,
-      players: gameRoom.players.map(player => ({
-        userId: player.userId,
-        name: player.name,
-        username: player.username,
-        avatarId: player.avatarId,
-        isReady: player.isReady,
-        isAlive: player.isAlive,
-        isEliminated: player.isEliminated,
-        // Include role and word if game is completed, OR if it's the current player
-        ...((gameRoom.status === 'completed') || player.userId.toString() === userId.toString()
-          ? { role: player.role, word: player.word }
-          : {})
-      })),
-      settings: gameRoom.settings,
-      status: gameRoom.status,
-      currentPhase: gameRoom.currentPhase,
-      currentRound: gameRoom.currentRound,
-      rounds: gameRoom.rounds || [],
-      messages: gameRoom.messages || [],
-      speakingOrder: gameRoom.rounds?.length > 0 ? gameRoom.rounds[gameRoom.currentRound - 1]?.speakingOrder : [],
-      // Only include winner and words if game is completed
-      ...(gameRoom.status === 'completed' ? { winner: gameRoom.winner, words: gameRoom.words } : {})
-    };
+    const roomDetails = buildRoomResponse(gameRoom, userId);
 
     res.json({ success: true, room: roomDetails });
   } catch (error) {
@@ -334,13 +322,7 @@ router.patch('/rooms/:roomCode/ready', auth, async (req, res) => {
 
     res.json({
       success: true,
-      room: {
-        roomCode: gameRoom.roomCode,
-        hostId: gameRoom.hostId,
-        players: gameRoom.players,
-        settings: gameRoom.settings,
-        status: gameRoom.status
-      }
+      room: buildRoomResponse(gameRoom, userId)
     });
   } catch (error) {
     console.error('Error updating ready status:', error);
@@ -462,18 +444,7 @@ router.patch('/rooms/:roomCode/settings', auth, async (req, res) => {
 
     res.json({
       success: true,
-      room: {
-        roomCode: updatedRoom.roomCode,
-        hostId: updatedRoom.hostId,
-        players: updatedRoom.players,
-        settings: updatedRoom.settings,
-        status: updatedRoom.status,
-        currentPhase: updatedRoom.currentPhase,
-        currentRound: updatedRoom.currentRound,
-        rounds: updatedRoom.rounds || [],
-        messages: updatedRoom.messages || [],
-        speakingOrder: updatedRoom.rounds?.length > 0 ? updatedRoom.rounds[updatedRoom.currentRound - 1]?.speakingOrder : [],
-      }
+      room: buildRoomResponse(updatedRoom, userId)
     });
   } catch (error) {
     console.error('Error updating game settings:', error);

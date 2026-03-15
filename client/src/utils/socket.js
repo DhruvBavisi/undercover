@@ -8,17 +8,24 @@ export const initSocket = () => {
 
   console.log('Initializing socket connection to:', SOCKET_URL);
 
-  socket = io(SOCKET_URL, {
-    transports: ['websocket', 'polling'],
-    autoConnect: true,
+  // Detect Safari and use polling-first strategy
+  const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+
+  const socketOptions = {
     reconnection: true,
-    reconnectionAttempts: Infinity,
-    reconnectionDelay: 1000,
-    reconnectionDelayMax: 5000,
-    randomizationFactor: 0.5,
+    reconnectionAttempts: Infinity,      // Never stop trying
+    reconnectionDelay: 1000,             // Start with 1s delay
+    reconnectionDelayMax: 5000,          // Cap at 5s
     timeout: 10000,
-    withCredentials: true
-  });
+    transports: isSafari
+      ? ['polling', 'websocket']   // polling first for Safari
+      : ['websocket', 'polling'],  // websocket first for others
+    autoConnect: true,
+    withCredentials: true,
+    randomizationFactor: 0.5
+  };
+
+  socket = io(SOCKET_URL, socketOptions);
 
   // Make socket available globally
   window.socket = socket;

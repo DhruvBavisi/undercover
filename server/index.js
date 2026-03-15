@@ -123,7 +123,22 @@ const io = new Server(server, {
     credentials: true
   },
   path: '/socket.io/',
-  transports: ['websocket', 'polling']
+  transports: ['websocket', 'polling'],
+  // Add these for mobile/Safari reliability:
+  pingTimeout: 20000,       // Detect dead connections faster (was default 20s, make explicit)
+  pingInterval: 10000,      // Ping more frequently for mobile (default 25s)
+  connectTimeout: 10000,    // Faster connect timeout
+  upgradeTimeout: 10000,
+
+  // Allow transport upgrade from polling to websocket
+  allowUpgrades: true,
+
+  // Cookie support for session persistence
+  cookie: false,
+
+  // Increase max reconnection attempts on client
+  // (this is a server hint via handshake)
+  reconnection: true
 });
 
 // Map to store user socket IDs
@@ -537,32 +552,38 @@ io.on('connection', (socket) => {
   // Join a game room lobby
   socket.on('join-room', async (data) => {
     const { roomCode, userId } = data;
+    const gameCode = roomCode;
+    const playerId = userId;
+
+    // CRITICAL: Always refresh socket mapping first
+    if (userId) {
+      userSocketMap[userId.toString()] = socket.id;
+      console.log(`User ${userId} joined room ${roomCode} with socket ${socket.id}`);
+    }
+
+    // Set socket data for the disconnect handler
+    socket.data = { gameCode, playerId };
 
     try {
-      // Set socket data for the disconnect handler
-      const gameCode = roomCode;
-      const playerId = userId;
-      socket.data = { gameCode, playerId };
-
       const room = await GameRoom.findOne({ roomCode: gameCode });
       if (room) {
         const existingPlayer = room.players.find(
           p => p.userId.toString() === playerId?.toString()
         );
 
+        // Case: Disconnected player reconnecting
         if (existingPlayer && existingPlayer.isDisconnected) {
-          // Player is reconnecting — restore their session
           existingPlayer.isDisconnected = false;
           existingPlayer.disconnectedAt = null;
           await room.save();
 
           socket.join(gameCode);
 
-          // Update userSocketMap to ensure future targeted emissions reach this reconnected socket
-          if (playerId) {
-            userSocketMap[playerId.toString()] = socket.id;
-            console.log(`Updated userSocketMap on reconnect: ${playerId} -> ${socket.id}`);
-          }
+          // Deliver their private role and word info since they might have missed it
+          socket.emit('role-info', {
+            role: existingPlayer.role,
+            word: existingPlayer.word
+          });
 
           // Send them their personal game state
           const currentRoundData = room.rounds[room.currentRound - 1];
@@ -575,33 +596,65 @@ io.on('connection', (socket) => {
             playerTurn: currentRoundData?.playerTurn || null,
             role: existingPlayer.role,
             word: existingPlayer.word,
-            messages: room.messages
-          });
-
-          // Deliver their private role and word info since they might have missed it
-          socket.emit('role-info', {
-            role: existingPlayer.role,
-            word: existingPlayer.word
+            messages: room.messages,
+            isEliminated: existingPlayer.isEliminated
           });
 
           // Notify others this player reconnected
           io.to(gameCode).emit('player-reconnected', {
             playerId,
-            playerName: existingPlayer.username,
-            message: `${existingPlayer.username} has reconnected`
+            playerName: existingPlayer.username || existingPlayer.name,
+            message: `${existingPlayer.username || existingPlayer.name} has reconnected`
           });
 
           return; // Skip the rest of join-room logic
         }
+
+        // Case: Active player page refresh / socket reconnect
+        if (existingPlayer && !existingPlayer.isDisconnected) {
+          socket.join(gameCode);
+
+          socket.emit('role-info', {
+            role: existingPlayer.role,
+            word: existingPlayer.word
+          });
+
+          if (room.status === 'in-progress') {
+            const currentRoundData = room.rounds[room.currentRound - 1];
+            socket.emit('session-restored', {
+              gameCode: room.roomCode,
+              status: room.status,
+              currentPhase: room.currentPhase,
+              currentRound: room.currentRound,
+              speakingOrder: currentRoundData?.speakingOrder || [],
+              playerTurn: currentRoundData?.playerTurn || null,
+              role: existingPlayer.role,
+              word: existingPlayer.word,
+              messages: room.messages,
+              isEliminated: existingPlayer.isEliminated
+            });
+          }
+
+          // Broadcast room state so all players see this player as active
+          io.to(gameCode).emit('room-updated', {
+            roomCode: room.roomCode,
+            hostId: room.hostId,
+            players: room.players,
+            settings: room.settings,
+            status: room.status,
+            currentPhase: room.currentPhase,
+            currentRound: room.currentRound,
+            rounds: room.rounds || [],
+            messages: room.messages || [],
+            speakingOrder: room.rounds?.length > 0
+              ? room.rounds[room.currentRound - 1]?.speakingOrder || []
+              : []
+          });
+          return;
+        }
       }
 
-      // Store socket ID in userSocketMap
-      if (userId) {
-        userSocketMap[userId.toString()] = socket.id;
-        console.log(`User ${userId} joined room ${roomCode} with socket ${socket.id}`);
-      }
-
-      // Join the socket room
+      // Join the socket room normally
       socket.join(roomCode);
       console.log(`User ${userId} joined room: ${roomCode}`);
 
